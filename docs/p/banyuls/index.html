@@ -283,7 +283,7 @@
     <h1 id="profils-verticaux-de-température">Profils verticaux de Température</h1>
 <p>On dispose des profils de Température de 0 à 50m de profondeur à Banyuls de 2019 à 2021. Les observations sont réalisées environ tous les deux mois. La sonde CTD permet un relevé plus ou moins tous les 0.10-0.20m.</p>
 <p>Pour obtenir des observations aux mêmes profondeurs, on réalise une interpolation sur les données existantes pour obtenir des valeurs tous les 0.5m de 0.5 à 50m de profondeur.</p>
-<p>On propose de réaliser une ACP fonctionnelle pour les profils de température pour chaque mois. On choisi de faire un liassage avec une spline cubique avec des noeuds localisés aux observations. On fixe notre paramètre de lissage <code>\(\lambda=10e-3\)</code>.</p>
+<p>On propose de réaliser une ACP fonctionnelle pour les profils de température pour chaque mois. On choisi de faire un liassage avec une spline cubique avec des noeuds localisés aux observations. On fixe notre paramètre de lissage $(\lambda=10e-3)$.</p>
 <div class="figure">
 <img src="https://ambremari.github.io/my_thesis_blog/p/banyuls/index_files/figure-html/unnamed-chunk-2-1.png" alt="a. Cinq premières composantes principales de l'ACP fonctionnelle réalisée sur les profils de température en janvier de 0.5 à 50m de profondeur à banyuls. b. Eboulis des valeurs propres associées aux composantes principales." width="576" />
 <p class="caption"><span id="fig:unnamed-chunk-2"></span>Figure 1: a. Cinq premières composantes principales de l'ACP fonctionnelle réalisée sur les profils de température en janvier de 0.5 à 50m de profondeur à banyuls. b. Eboulis des valeurs propres associées aux composantes principales.</p>
