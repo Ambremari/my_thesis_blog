@@ -1,0 +1,1260 @@
+---
+title: "Banyuls"
+author: Mathilde COUTEYEN CARPAYE
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning=FALSE, message=FALSE, results = FALSE, fig.pos='!H')
+my_palette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+###CHARGEMENT DONNEES HYDRO 1994-2021###
+library(readr)
+library(tidyverse)
+library(naniar)
+library(lubridate)
+library(latex2exp)
+library(fda)
+library(gridExtra)
+library(ggpubr)
+CTD_banyuls <- read.csv("CTD_banyuls.csv")
+dmonths <- seq(15, 360, 30)
+months <- c("Jan", "Feb", "Mar", "Apr", "May", "Jun", 
+            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+```
+
+# Profils verticaux de Température
+
+On dispose des profils de Température de 0 à 50m de profondeur à Banyuls de 2019 à 2021. Les observations sont réalisées environ tous les deux mois. La sonde CTD permet un relevé plus ou moins tous les 0.10-0.20m. 
+
+Pour obtenir des observations aux mêmes profondeurs, on réalise une interpolation sur les données existantes pour obtenir des valeurs tous les 0.5m de 0.5 à 50m de profondeur. 
+
+```{r}
+arg_prof <- seq(0.5, 55, 0.5)
+n_points <- length(arg_prof)
+dates <- unique(CTD_banyuls$DATE)
+all_temp <- data.frame("DATE"=NULL, "arg_prof"=NULL, "temp"=NULL)
+for(d in dates){
+  profil <- CTD_banyuls %>% filter(DATE==d)
+  temp <- approx(profil$PROFONDEUR, profil$TEMPERATURE, rule=2, xout=arg_prof)$y
+  date <- rep(d, n_points)
+  seul <- data.frame("DATE"=date, arg_prof, temp)
+  all_temp <- rbind(all_temp, seul)
+}
+all_temp <- all_temp %>% mutate("gp_prof"=NA)
+gp <- c(1:19)
+for(g in gp){
+  max <- g*3
+  min <- (g-1)*3
+  all_temp <- all_temp %>% mutate(gp_prof=ifelse(arg_prof<=max & arg_prof>min, g, gp_prof))
+}
+all_temp <- all_temp %>% mutate(DATE=ymd(DATE), 
+ANNEE= year(DATE), MOIS=month(DATE), 
+JOUR=mday(DATE))
+all_temp[,2] <- as.numeric(all_temp[,2])
+all_temp[,3] <- as.numeric(all_temp[,3])
+```
+
+On propose de réaliser une ACP fonctionnelle pour les profils de température pour chaque mois. On choisi de faire un liassage avec une spline cubique avec des noeuds localisés aux observations. On fixe notre paramètre de lissage $\lambda=10e-3$.   
+
+
+
+```{r, fig.width=6, fig.cap="a. Cinq premières composantes principales de l'ACP fonctionnelle réalisée sur les profils de température en janvier de 0.5 à 50m de profondeur à banyuls. b. Eboulis des valeurs propres associées aux composantes principales."}
+temp_jan <- all_temp %>% filter(MOIS==1)
+n_curves_jan <- length(unique((temp_jan$DATE)))
+argvals <- matrix(temp_jan$arg_prof, nrow=n_points, ncol=n_curves_jan)
+y_mat_jan <- matrix(temp_jan$temp, nrow=n_points, ncol=n_curves_jan)
+basis <- create.bspline.basis(c(0.5,55), breaks=arg_prof, norder=4)
+W.obj_jan <- Data2fd(argvals = argvals, y = y_mat_jan, basisobj = basis, lambda = 10e-3)
+facp_jan <- pca.fd(fdobj = W.obj_jan, nharm=5)
+par(mfrow=c(1,2), mar=c(2.1,2.1,1.5,0.5), mgp=c(1.2,0.5,0))
+plot(NULL, xlim=c(0.5,50), ylim=c(-0.4,0.4), lwd = 3, xlab='Profondeur', ylab='Harmoniques', bty='n', cex.axis=0.7, cex.lab=0.8, cex.main=0.9, main='a.')
+abline(h=0, lty='dashed')
+lines(facp_jan$harmonics) 
+legend(x="topright", legend=c("PC1", "PC2", "PC3", "PC4", "PC5"), col=1:5, lty=1:5, cex=0.6)
+pc <- round(facp_jan$values/sum(facp_jan$values)*100, 3)
+plot(pc, type="h", xlab="Valeurs Propres", ylab="% d'inertie", xlim=c(1,10), bty='n', lwd=2, cex.axis=0.7, cex.lab=0.8, cex.main=0.9, main='b.')
+pc1_jan <- round(facp_jan$values[1]/sum(facp_jan$values)*100, 2)
+pc2_jan <- round(facp_jan$values[2]/sum(facp_jan$values)*100, 2)
+```
+
+```{r, fig.cap="Deux premières composantes principales de l'ACP fonctionelle réalisée sur les profils verticaux de température en janvier, exprimées comme perturbation de la moyenne. La ligne noire représente la moyenne. La ligne grise représente l'effet d'une perturbation positive. La ligne orange représente l'effet d'une perturbation négative."}
+pert_1p <- fd(basisobj=basis)
+pert_1n <- fd(basisobj=basis)
+pert_2p <- fd(basisobj=basis)
+pert_2n <- fd(basisobj=basis)
+
+xx <- seq(0.5, 50, 0.2)
+
+mean_jan <- mean.fd(W.obj_jan)
+pc1 <- matrix(facp_jan$harmonics$coefs[,1], ncol=1)
+pert_1p$coefs <- mean_jan$coefs + sqrt(facp_jan$values[1]) * pc1
+pert_1n$coefs <- mean_jan$coefs - sqrt(facp_jan$values[1]) * pc1
+
+df_mean_jan <- data.frame(x=xx, yhat = predict(mean_jan, newdata=xx))
+df_pcp1_jan <- data.frame(x=xx, yhat = predict(pert_1p, newdata=xx))
+df_pcn1_jan <- data.frame(x=xx, yhat = predict(pert_1n, newdata=xx))
+
+pc2 <- matrix(facp_jan$harmonics$coefs[,2], ncol=1)
+pert_2p$coefs <- mean_jan$coefs + sqrt(facp_jan$values[2]) * pc2
+pert_2n$coefs <- mean_jan$coefs - sqrt(facp_jan$values[2]) * pc2
+df_pcp2_jan <- data.frame(x=xx, yhat = predict(pert_2p, newdata=xx))
+df_pcn2_jan <- data.frame(x=xx, yhat = predict(pert_2n, newdata=xx))
+
+A <- ggplot() + geom_point(data=df_mean_jan, aes(mean, xx), cex=0.4) +
+  geom_point(data=df_pcp1_jan, aes(mean, xx), cex=0.01, col=my_palette[1]) +
+  geom_point(data=df_pcn1_jan, aes(mean, xx), cex=0.01, col=my_palette[2]) +
+  scale_y_reverse() +
+  theme_minimal() + ylab('Profondeur') + xlab('Température (°C)') +
+  scale_x_continuous() + ggtitle(paste('PC1', pc1_jan, '%'))
+B <- ggplot() + geom_point(data=df_mean_jan, aes(mean, xx), cex=0.4) +
+  geom_point(data=df_pcp2_jan, aes(mean, xx), cex=0.1, col=my_palette[1]) +
+  geom_point(data=df_pcn2_jan, aes(mean, xx), cex=0.1, col=my_palette[2]) +
+  scale_y_reverse() +
+  theme_minimal() + ylab('') + xlab('Température (°C)') +
+  scale_x_continuous(limits=c(12, 14.5)) + ggtitle(paste('PC2', pc2_jan, '%'))
+grid.arrange(A,B, ncol=2)
+```
+
+```{r, fig.cap="Représentation bi-dimensionnelle des scores de l'ACP réalisée sur les profils de température à banyuls en janvier. Les années sont représentées par un gradient de couleur."}
+label_jan <- temp_jan$ANNEE*100 + temp_jan$JOUR
+label_jan <- unique(label_jan)
+df_pc_jan <- data.frame('PC1'=facp_jan$scores[,1], 
+                    'PC2'=facp_jan$scores[,2],
+                    label_jan)
+plot_jan <- df_pc_jan %>% ggplot() + 
+  theme_light() + 
+  geom_vline(xintercept = 0, linetype='dashed') +
+  geom_hline(yintercept=0, linetype='dashed') +
+  geom_point(aes(PC1, PC2, col=label_jan), size=2) +
+  theme(aspect.ratio = 1) +
+  xlab(paste('PC1', pc1_jan, '%')) +
+  ylab(paste('PC2', pc2_jan, '%')) +
+  scale_colour_gradient2(low=my_palette[3], high=my_palette[2], mid=my_palette[4], midpoint=202000,
+                           name="Année", 
+                        breaks=seq(201900, 202200, 100),
+                        labels=c(2019, 2020, 2021, 2022)) +
+  guides(colour = guide_colourbar( ticks=FALSE)) 
+plot_jan 
+```
+
+
+
+```{r, fig.width=6, fig.cap="a. Cinq premières composantes principales de l'ACp fonctionnelle réalisée sur les profils de température en février de 0.5 à 50m de profondeur à banyuls. b. Eboulis des valeurs propres associées aux composantes principales."}
+temp_fev <- all_temp %>% filter(MOIS==2)
+n_curves_fev <- length(unique((temp_fev$DATE)))
+argvals <- matrix(temp_fev$arg_prof, nrow=n_points, ncol=n_curves_fev)
+y_mat_fev <- matrix(temp_fev$temp, nrow=n_points, ncol=n_curves_fev)
+basis <- create.bspline.basis(c(0.5,55), breaks=arg_prof, norder=4)
+W.obj_fev <- Data2fd(argvals = argvals, y = y_mat_fev, basisobj = basis, lambda = 10e-3)
+facp_fev <- pca.fd(fdobj = W.obj_fev, nharm=5)
+par(mfrow=c(1,2), mar=c(2.1,2.1,1.5,0.5), mgp=c(1.2,0.5,0))
+plot(NULL, xlim=c(0.5,50), ylim=c(-0.4,0.4), lwd = 3, xlab='Profondeur', ylab='Harmoniques', bty='n', cex.axis=0.7, cex.lab=0.8, cex.main=0.9, main='a.')
+abline(h=0, lty='dashed')
+lines(facp_fev$harmonics) ; legend(x="topright", legend=c("PC1", "PC2", "PC3", "PC4", "PC5"), col=1:5, lty=1:5, cex=0.6)
+pc <- round(facp_fev$values/sum(facp_fev$values)*100, 3)
+plot(pc, type="h", xlab="Valeurs Propres", ylab="% d'inertie", xlim=c(1,10), bty='n', lwd=2, cex.axis=0.7, cex.lab=0.8, cex.main=0.9, main='b.')
+pc1_fev <- round(facp_fev$values[1]/sum(facp_fev$values)*100, 2)
+pc2_fev <- round(facp_fev$values[2]/sum(facp_fev$values)*100, 2)
+```
+
+```{r, fig.cap="Deux premières composantes principales de l'ACP fonctionelle réalisée sur les profils verticaux de température en février, exprimées comme perturbation de la moyenne. La ligne noire représente la moyenne. La ligne grise représente l'effet d'une perturbation positive. La ligne orange représente l'effet d'une perturbation négative."}
+pert_1p <- fd(basisobj=basis)
+pert_1n <- fd(basisobj=basis)
+pert_2p <- fd(basisobj=basis)
+pert_2n <- fd(basisobj=basis)
+
+xx <- seq(0.5, 50, 0.2)
+
+mean_fev <- mean.fd(W.obj_fev)
+pc1 <- matrix(facp_fev$harmonics$coefs[,1], ncol=1)
+pert_1p$coefs <- mean_fev$coefs + sqrt(facp_fev$values[1]) * pc1
+pert_1n$coefs <- mean_fev$coefs - sqrt(facp_fev$values[1]) * pc1
+
+df_mean_fev <- data.frame(x=xx, yhat = predict(mean_fev, newdata=xx))
+df_pcp1_fev <- data.frame(x=xx, yhat = predict(pert_1p, newdata=xx))
+df_pcn1_fev <- data.frame(x=xx, yhat = predict(pert_1n, newdata=xx))
+
+pc2 <- matrix(facp_fev$harmonics$coefs[,2], ncol=1)
+pert_2p$coefs <- mean_fev$coefs + sqrt(facp_fev$values[2]) * pc2
+pert_2n$coefs <- mean_fev$coefs - sqrt(facp_fev$values[2]) * pc2
+df_pcp2_fev <- data.frame(x=xx, yhat = predict(pert_2p, newdata=xx))
+df_pcn2_fev <- data.frame(x=xx, yhat = predict(pert_2n, newdata=xx))
+
+A <- ggplot() + geom_point(data=df_mean_fev, aes(mean, xx), cex=0.4) +
+  geom_point(data=df_pcp1_fev, aes(mean, xx), cex=0.01, col=my_palette[1]) +
+  geom_point(data=df_pcn1_fev, aes(mean, xx), cex=0.01, col=my_palette[2]) +
+  scale_y_reverse() +
+  theme_minimal() + ylab('Profondeur') + xlab('Température (°C)') +
+  scale_x_continuous(limits=c(11, 15)) + ggtitle(paste('PC1', pc1_fev, '%'))
+B <- ggplot() + geom_point(data=df_mean_fev, aes(mean, xx), cex=0.4) +
+  geom_point(data=df_pcp2_fev, aes(mean, xx), cex=0.1, col=my_palette[1]) +
+  geom_point(data=df_pcn2_fev, aes(mean, xx), cex=0.1, col=my_palette[2]) +
+  scale_y_reverse() +
+  theme_minimal() + ylab('') + xlab('Température (°C)') +
+  scale_x_continuous(limits=c(12, 14)) + ggtitle(paste('PC2', pc2_fev, '%'))
+grid.arrange(A,B, ncol=2)
+```
+
+```{r, fig.cap="Représentation bi-dimensionnelle des scores de l'ACP réalisée sur les profils de température à banyuls en février. Les années sont représentées par un gradient de couleur."}
+label_fev <- temp_fev$ANNEE*100 + temp_fev$JOUR
+label_fev <- unique(label_fev)
+df_pc_fev <- data.frame('PC1'=facp_fev$scores[,1], 
+                    'PC2'=facp_fev$scores[,2],
+                    label_fev)
+plot_fev <- df_pc_fev %>% ggplot() + 
+  theme_light() + 
+  geom_vline(xintercept = 0, linetype='dashed') +
+  geom_hline(yintercept=0, linetype='dashed') +
+  geom_point(aes(PC1, PC2, col=label_fev), size=2) +
+  theme(aspect.ratio = 1) +
+  xlab(paste('PC1', pc1_fev, '%')) +
+  ylab(paste('PC2', pc2_fev, '%')) +
+  scale_colour_gradient2(low=my_palette[3], high=my_palette[2], mid=my_palette[4], midpoint=202000,
+                           name="Année", 
+                        breaks=seq(201900, 202200, 100),
+                        labels=c(2019, 2020, 2021, 2022)) +
+  guides(colour = guide_colourbar( ticks=FALSE)) 
+plot_fev
+```
+
+
+
+```{r, fig.width=6, fig.cap="a. Cinq premières composantes principales de l'ACp fonctionnelle réalisée sur les profils de température en mars de 0.5 à 50m de profondeur à banyuls. b. Eboulis des valeurs propres associées aux composantes principales."}
+temp_mar <- all_temp %>% filter(MOIS==3)
+n_curves_mar <- length(unique((temp_mar$DATE)))
+argvals <- matrix(temp_mar$arg_prof, nrow=n_points, ncol=n_curves_mar)
+y_mat_mar <- matrix(temp_mar$temp, nrow=n_points, ncol=n_curves_mar)
+basis <- create.bspline.basis(c(0.5,55), breaks=arg_prof, norder=4)
+W.obj_mar <- Data2fd(argvals = argvals, y = y_mat_mar, basisobj = basis, lambda = 10e-3)
+facp_mar <- pca.fd(fdobj = W.obj_mar, nharm=5)
+par(mfrow=c(1,2), mar=c(2.1,2.1,1.5,0.5), mgp=c(1.2,0.5,0))
+plot(NULL, xlim=c(0.5,50), ylim=c(-0.4,0.4), lwd = 3, xlab='Profondeur', ylab='Harmoniques', bty='n', cex.axis=0.7, cex.lab=0.8, cex.main=0.9, main='a.')
+abline(h=0, lty='dashed')
+lines(facp_mar$harmonics) ; legend(x="topright", legend=c("PC1", "PC2", "PC3", "PC4", "PC5"), col=1:5, lty=1:5, cex=0.6)
+pc <- round(facp_mar$values/sum(facp_mar$values)*100, 3)
+plot(pc, type="h", xlab="Valeurs Propres", ylab="% d'inertie", xlim=c(1,10), bty='n', lwd=2, cex.axis=0.7, cex.lab=0.8, cex.main=0.9, main='b.')
+pc1_mar <- round(facp_mar$values[1]/sum(facp_mar$values)*100, 2)
+pc2_mar <- round(facp_mar$values[2]/sum(facp_mar$values)*100, 2)
+```
+
+```{r, fig.cap="Deux premières composantes principales de l'ACP fonctionelle réalisée sur les profils verticaux de température en mars, exprimées comme perturbation de la moyenne. La ligne noire représente la moyenne. La ligne grise représente l'effet d'une perturbation positive. La ligne orange représente l'effet d'une perturbation négative."}
+pert_1p <- fd(basisobj=basis)
+pert_1n <- fd(basisobj=basis)
+pert_2p <- fd(basisobj=basis)
+pert_2n <- fd(basisobj=basis)
+
+xx <- seq(0.5, 50, 0.2)
+
+mean_mar <- mean.fd(W.obj_mar)
+pc1 <- matrix(facp_mar$harmonics$coefs[,1], ncol=1)
+pert_1p$coefs <- mean_mar$coefs + sqrt(facp_mar$values[1]) * pc1
+pert_1n$coefs <- mean_mar$coefs - sqrt(facp_mar$values[1]) * pc1
+
+df_mean_mar <- data.frame(x=xx, yhat = predict(mean_mar, newdata=xx))
+df_pcp1_mar <- data.frame(x=xx, yhat = predict(pert_1p, newdata=xx))
+df_pcn1_mar <- data.frame(x=xx, yhat = predict(pert_1n, newdata=xx))
+
+pc2 <- matrix(facp_mar$harmonics$coefs[,2], ncol=1)
+pert_2p$coefs <- mean_mar$coefs + sqrt(facp_mar$values[2]) * pc2
+pert_2n$coefs <- mean_mar$coefs - sqrt(facp_mar$values[2]) * pc2
+df_pcp2_mar <- data.frame(x=xx, yhat = predict(pert_2p, newdata=xx))
+df_pcn2_mar <- data.frame(x=xx, yhat = predict(pert_2n, newdata=xx))
+
+A <- ggplot() + geom_point(data=df_mean_mar, aes(mean, xx), cex=0.4) +
+  geom_point(data=df_pcp1_mar, aes(mean, xx), cex=0.01, col=my_palette[1]) +
+  geom_point(data=df_pcn1_mar, aes(mean, xx), cex=0.01, col=my_palette[2]) +
+  scale_y_reverse() +
+  theme_minimal() + ylab('Profondeur') + xlab('Température (°C)') +
+  scale_x_continuous(limits=c(12, 15)) + ggtitle(paste('PC1', pc1_mar, '%'))
+B <- ggplot() + geom_point(data=df_mean_mar, aes(mean, xx), cex=0.4) +
+  geom_point(data=df_pcp2_mar, aes(mean, xx), cex=0.1, col=my_palette[1]) +
+  geom_point(data=df_pcn2_mar, aes(mean, xx), cex=0.1, col=my_palette[2]) +
+  scale_y_reverse() +
+  theme_minimal() + ylab('') + xlab('Température (°C)') +
+  scale_x_continuous(limits=c(12, 14)) + ggtitle(paste('PC2', pc2_mar, '%'))
+grid.arrange(A,B, ncol=2)
+```
+
+```{r, fig.cap="Représentation bi-dimensionnelle des scores de l'ACP réalisée sur les profils de température à banyuls en mars. Les années sont représentées par un gradient de couleur."}
+label_mar <- temp_mar$ANNEE*100 + temp_mar$JOUR
+label_mar <- unique(label_mar)
+df_pc_mar <- data.frame('PC1'=facp_mar$scores[,1], 
+                    'PC2'=facp_mar$scores[,2],
+                    label_mar)
+plot_mar <- df_pc_mar %>% ggplot() + 
+  theme_light() + 
+  geom_vline(xintercept = 0, linetype='dashed') +
+  geom_hline(yintercept=0, linetype='dashed') +
+  geom_point(aes(PC1, PC2, col=label_mar), size=2) +
+  theme(aspect.ratio = 1) +
+  xlab(paste('PC1', pc1_mar, '%')) +
+  ylab(paste('PC2', pc2_mar, '%')) +
+  scale_colour_gradient2(low=my_palette[3], high=my_palette[2], mid=my_palette[4], midpoint=202000,
+                           name="Année", 
+                        breaks=seq(201900, 202200, 100),
+                        labels=c(2019, 2020, 2021, 2022)) +
+  guides(colour = guide_colourbar( ticks=FALSE)) 
+plot_mar
+```
+
+
+
+```{r, fig.width=6, fig.cap="a. Cinq premières composantes principales de l'ACp fonctionnelle réalisée sur les profils de température en avril de 0.5 à 50m de profondeur à banyuls. b. Eboulis des valeurs propres associées aux composantes principales."}
+temp_avr <- all_temp %>% filter(MOIS==4)
+n_curves_avr <- length(unique((temp_avr$DATE)))
+argvals <- matrix(temp_avr$arg_prof, nrow=n_points, ncol=n_curves_avr)
+y_mat_avr <- matrix(temp_avr$temp, nrow=n_points, ncol=n_curves_avr)
+basis <- create.bspline.basis(c(0.5,55), breaks=arg_prof, norder=4)
+W.obj_avr <- Data2fd(argvals = argvals, y = y_mat_avr, basisobj = basis, lambda = 10e-3)
+facp_avr <- pca.fd(fdobj = W.obj_avr, nharm=5)
+par(mfrow=c(1,2), mar=c(2.1,2.1,1.5,0.5), mgp=c(1.2,0.5,0))
+plot(NULL, xlim=c(0.5,50), ylim=c(-0.4,0.4), lwd = 3, xlab='Profondeur', ylab='Harmoniques', bty='n', cex.axis=0.7, cex.lab=0.8, cex.main=0.9, main='a.')
+abline(h=0, lty='dashed')
+lines(facp_avr$harmonics) ; legend(x="topright", legend=c("PC1", "PC2", "PC3", "PC4", "PC5"), col=1:5, lty=1:5, cex=0.6)
+pc <- round(facp_avr$values/sum(facp_avr$values)*100, 3)
+plot(pc, type="h", xlab="Valeurs Propres", ylab="% d'inertie", xlim=c(1,10), bty='n', lwd=2, cex.axis=0.7, cex.lab=0.8, cex.main=0.9, main='b.')
+pc1_avr <- round(facp_avr$values[1]/sum(facp_avr$values)*100, 2)
+pc2_avr <- round(facp_avr$values[2]/sum(facp_avr$values)*100, 2)
+```
+
+```{r, fig.cap="Deux premières composantes principales de l'ACP fonctionelle réalisée sur les profils verticaux de température en avril, exprimées comme perturbation de la moyenne. La ligne noire représente la moyenne. La ligne grise représente l'effet d'une perturbation positive. La ligne orange représente l'effet d'une perturbation négative."}
+pert_1p <- fd(basisobj=basis)
+pert_1n <- fd(basisobj=basis)
+pert_2p <- fd(basisobj=basis)
+pert_2n <- fd(basisobj=basis)
+
+xx <- seq(0.5, 50, 0.2)
+
+mean_avr <- mean.fd(W.obj_avr)
+pc1 <- matrix(facp_avr$harmonics$coefs[,1], ncol=1)
+pert_1p$coefs <- mean_avr$coefs + sqrt(facp_avr$values[1]) * pc1
+pert_1n$coefs <- mean_avr$coefs - sqrt(facp_avr$values[1]) * pc1
+
+df_mean_avr <- data.frame(x=xx, yhat = predict(mean_avr, newdata=xx))
+df_pcp1_avr <- data.frame(x=xx, yhat = predict(pert_1p, newdata=xx))
+df_pcn1_avr <- data.frame(x=xx, yhat = predict(pert_1n, newdata=xx))
+
+pc2 <- matrix(facp_avr$harmonics$coefs[,2], ncol=1)
+pert_2p$coefs <- mean_avr$coefs + sqrt(facp_avr$values[2]) * pc2
+pert_2n$coefs <- mean_avr$coefs - sqrt(facp_avr$values[2]) * pc2
+df_pcp2_avr <- data.frame(x=xx, yhat = predict(pert_2p, newdata=xx))
+df_pcn2_avr <- data.frame(x=xx, yhat = predict(pert_2n, newdata=xx))
+
+A <- ggplot() + geom_point(data=df_mean_avr, aes(mean, xx), cex=0.4) +
+  geom_point(data=df_pcp1_avr, aes(mean, xx), cex=0.01, col=my_palette[1]) +
+  geom_point(data=df_pcn1_avr, aes(mean, xx), cex=0.01, col=my_palette[2]) +
+  scale_y_reverse() +
+  theme_minimal() + ylab('Profondeur') + xlab('Température (°C)') +
+  scale_x_continuous(limits=c(12, 15)) + ggtitle(paste('PC1', pc1_avr, '%'))
+B <- ggplot() + geom_point(data=df_mean_avr, aes(mean, xx), cex=0.4) +
+  geom_point(data=df_pcp2_avr, aes(mean, xx), cex=0.1, col=my_palette[1]) +
+  geom_point(data=df_pcn2_avr, aes(mean, xx), cex=0.1, col=my_palette[2]) +
+  scale_y_reverse() +
+  theme_minimal() + ylab('') + xlab('Température (°C)') +
+  scale_x_continuous(limits=c(13, 15)) + ggtitle(paste('PC2', pc2_avr, '%'))
+grid.arrange(A,B, ncol=2)
+```
+
+```{r, fig.cap="Représentation bi-dimensionnelle des scores de l'ACP réalisée sur les profils de température à banyuls en avril. Les années sont représentées par un gradient de couleur."}
+label_avr <- temp_avr$ANNEE*100 + temp_avr$JOUR
+label_avr <- unique(label_avr)
+df_pc_avr <- data.frame('PC1'=facp_avr$scores[,1], 
+                    'PC2'=facp_avr$scores[,2],
+                    label_avr)
+plot_avr <- df_pc_avr %>% ggplot() + 
+  theme_light() + 
+  geom_vline(xintercept = 0, linetype='dashed') +
+  geom_hline(yintercept=0, linetype='dashed') +
+  geom_point(aes(PC1, PC2, col=label_avr), size=2) +
+  theme(aspect.ratio = 1) +
+  xlab(paste('PC1', pc1_avr, '%')) +
+  ylab(paste('PC2', pc2_avr, '%')) +
+  scale_colour_gradient2(low=my_palette[3], high=my_palette[2], mid=my_palette[4], midpoint=202000,
+                           name="Année", 
+                        breaks=seq(201900, 202200, 100),
+                        labels=c(2019, 2020, 2021, 2022)) +
+  guides(colour = guide_colourbar( ticks=FALSE)) 
+plot_avr
+```
+
+
+
+```{r, fig.width=6, fig.cap="a. Cinq premières composantes principales de l'ACp fonctionnelle réalisée sur les profils de température en mai de 0.5 à 50m de profondeur à banyuls. b. Eboulis des valeurs propres associées aux composantes principales."}
+temp_mai <- all_temp %>% filter(MOIS==5)
+n_curves_mai <- length(unique((temp_mai$DATE)))
+argvals <- matrix(temp_mai$arg_prof, nrow=n_points, ncol=n_curves_mai)
+y_mat_mai <- matrix(temp_mai$temp, nrow=n_points, ncol=n_curves_mai)
+basis <- create.bspline.basis(c(0.5,55), breaks=arg_prof, norder=4)
+W.obj_mai <- Data2fd(argvals = argvals, y = y_mat_mai, basisobj = basis, lambda = 10e-3)
+facp_mai <- pca.fd(fdobj = W.obj_mai, nharm=5)
+par(mfrow=c(1,2), mar=c(2.1,2.1,1.5,0.5), mgp=c(1.2,0.5,0))
+plot(NULL, xlim=c(0.5,50), ylim=c(-0.4,0.4), lwd = 3, xlab='Profondeur', ylab='Harmoniques', bty='n', cex.axis=0.7, cex.lab=0.8, cex.main=0.9, main='a.')
+abline(h=0, lty='dashed')
+lines(facp_mai$harmonics) ; legend(x="topright", legend=c("PC1", "PC2", "PC3", "PC4", "PC5"), col=1:5, lty=1:5, cex=0.6)
+pc <- round(facp_mai$values/sum(facp_mai$values)*100, 3)
+plot(pc, type="h", xlab="Valeurs Propres", ylab="% d'inertie", xlim=c(1,10), bty='n', lwd=2, cex.axis=0.7, cex.lab=0.8, cex.main=0.9, main='b.')
+pc1_mai <- round(facp_mai$values[1]/sum(facp_mai$values)*100, 2)
+pc2_mai <- round(facp_mai$values[2]/sum(facp_mai$values)*100, 2)
+```
+
+```{r, fig.cap="Deux premières composantes principales de l'ACP fonctionelle réalisée sur les profils verticaux de température en mai, exprimées comme perturbation de la moyenne. La ligne noire représente la moyenne. La ligne grise représente l'effet d'une perturbation positive. La ligne orange représente l'effet d'une perturbation négative."}
+pert_1p <- fd(basisobj=basis)
+pert_1n <- fd(basisobj=basis)
+pert_2p <- fd(basisobj=basis)
+pert_2n <- fd(basisobj=basis)
+
+xx <- seq(0.5, 50, 0.2)
+
+mean_mai <- mean.fd(W.obj_mai)
+pc1 <- matrix(facp_mai$harmonics$coefs[,1], ncol=1)
+pert_1p$coefs <- mean_mai$coefs + sqrt(facp_mai$values[1]) * pc1
+pert_1n$coefs <- mean_mai$coefs - sqrt(facp_mai$values[1]) * pc1
+
+df_mean_mai <- data.frame(x=xx, yhat = predict(mean_mai, newdata=xx))
+df_pcp1_mai <- data.frame(x=xx, yhat = predict(pert_1p, newdata=xx))
+df_pcn1_mai <- data.frame(x=xx, yhat = predict(pert_1n, newdata=xx))
+
+pc2 <- matrix(facp_mai$harmonics$coefs[,2], ncol=1)
+pert_2p$coefs <- mean_mai$coefs + sqrt(facp_mai$values[2]) * pc2
+pert_2n$coefs <- mean_mai$coefs - sqrt(facp_mai$values[2]) * pc2
+df_pcp2_mai <- data.frame(x=xx, yhat = predict(pert_2p, newdata=xx))
+df_pcn2_mai <- data.frame(x=xx, yhat = predict(pert_2n, newdata=xx))
+
+A <- ggplot() + geom_point(data=df_mean_mai, aes(mean, xx), cex=0.4) +
+  geom_point(data=df_pcp1_mai, aes(mean, xx), cex=0.01, col=my_palette[1]) +
+  geom_point(data=df_pcn1_mai, aes(mean, xx), cex=0.01, col=my_palette[2]) +
+  scale_y_reverse() +
+  theme_minimal() + ylab('Profondeur') + xlab('Température (°C)') +
+  scale_x_continuous(limits=c(12, 18)) + ggtitle(paste('PC1', pc1_mai, '%'))
+B <- ggplot() + geom_point(data=df_mean_mai, aes(mean, xx), cex=0.4) +
+  geom_point(data=df_pcp2_mai, aes(mean, xx), cex=0.1, col=my_palette[1]) +
+  geom_point(data=df_pcn2_mai, aes(mean, xx), cex=0.1, col=my_palette[2]) +
+  scale_y_reverse() +
+  theme_minimal() + ylab('') + xlab('Température (°C)') +
+  scale_x_continuous() + ggtitle(paste('PC2', pc2_mai, '%'))
+grid.arrange(A,B, ncol=2)
+```
+
+```{r, fig.cap="Représentation bi-dimensionnelle des scores de l'ACP réalisée sur les profils de température à banyuls en mai. Les années sont représentées par un gradient de couleur."}
+label_mai <- temp_mai$ANNEE*100 + temp_mai$JOUR
+label_mai <- unique(label_mai)
+df_pc_mai <- data.frame('PC1'=facp_mai$scores[,1], 
+                    'PC2'=facp_mai$scores[,2],
+                    label_mai)
+plot_mai <- df_pc_mai %>% ggplot() + 
+  theme_light() + 
+  geom_vline(xintercept = 0, linetype='dashed') +
+  geom_hline(yintercept=0, linetype='dashed') +
+  geom_point(aes(PC1, PC2, col=label_mai), size=2) +
+  theme(aspect.ratio = 1) +
+  xlab(paste('PC1', pc1_mai, '%')) +
+  ylab(paste('PC2', pc2_mai, '%')) +
+  scale_colour_gradient2(low=my_palette[3], high=my_palette[2], mid=my_palette[4], midpoint=202000,
+                           name="Année", 
+                        breaks=seq(201900, 202200, 100),
+                        labels=c(2019, 2020, 2021, 2022)) +
+  guides(colour = guide_colourbar( ticks=FALSE)) 
+plot_mai
+```
+
+
+
+```{r, fig.width=6, fig.cap="a. Cinq premières composantes principales de l'ACp fonctionnelle réalisée sur les profils de température en juin de 0.5 à 50m de profondeur à banyuls. b. Eboulis des valeurs propres associées aux composantes principales."}
+temp_jun <- all_temp %>% filter(MOIS==6)
+n_curves_jun <- length(unique((temp_jun$DATE)))
+argvals <- matrix(temp_jun$arg_prof, nrow=n_points, ncol=n_curves_jun)
+y_mat_jun <- matrix(temp_jun$temp, nrow=n_points, ncol=n_curves_jun)
+basis <- create.bspline.basis(c(0.5,55), breaks=arg_prof, norder=4)
+W.obj_jun <- Data2fd(argvals = argvals, y = y_mat_jun, basisobj = basis, lambda = 10e-3)
+facp_jun <- pca.fd(fdobj = W.obj_jun, nharm=5)
+par(mfrow=c(1,2), mar=c(2.1,2.1,1.5,0.5), mgp=c(1.2,0.5,0))
+plot(NULL, xlim=c(0.5,50), ylim=c(-0.4,0.4), lwd = 3, xlab='Profondeur', ylab='Harmoniques', bty='n', cex.axis=0.7, cex.lab=0.8, cex.main=0.9, main='a.')
+abline(h=0, lty='dashed')
+lines(facp_jun$harmonics) ; legend(x="topright", legend=c("PC1", "PC2", "PC3", "PC4", "PC5"), col=1:5, lty=1:5, cex=0.6)
+pc <- round(facp_jun$values/sum(facp_jun$values)*100, 3)
+plot(pc, type="h", xlab="Valeurs Propres", ylab="% d'inertie", xlim=c(1,10), bty='n', lwd=2, cex.axis=0.7, cex.lab=0.8, cex.main=0.9, main='b.')
+pc1_jun <- round(facp_jun$values[1]/sum(facp_jun$values)*100, 2)
+pc2_jun <- round(facp_jun$values[2]/sum(facp_jun$values)*100, 2)
+```
+
+```{r, fig.cap="Deux premières composantes principales de l'ACP fonctionelle réalisée sur les profils verticaux de température en juin, exprimées comme perturbation de la moyenne. La ligne noire représente la moyenne. La ligne grise représente l'effet d'une perturbation positive. La ligne orange représente l'effet d'une perturbation négative."}
+pert_1p <- fd(basisobj=basis)
+pert_1n <- fd(basisobj=basis)
+pert_2p <- fd(basisobj=basis)
+pert_2n <- fd(basisobj=basis)
+
+xx <- seq(0.5, 50, 0.2)
+
+mean_jun <- mean.fd(W.obj_jun)
+pc1 <- matrix(facp_jun$harmonics$coefs[,1], ncol=1)
+pert_1p$coefs <- mean_jun$coefs + sqrt(facp_jun$values[1]) * pc1
+pert_1n$coefs <- mean_jun$coefs - sqrt(facp_jun$values[1]) * pc1
+
+df_mean_jun <- data.frame(x=xx, yhat = predict(mean_jun, newdata=xx))
+df_pcp1_jun <- data.frame(x=xx, yhat = predict(pert_1p, newdata=xx))
+df_pcn1_jun <- data.frame(x=xx, yhat = predict(pert_1n, newdata=xx))
+
+pc2 <- matrix(facp_jun$harmonics$coefs[,2], ncol=1)
+pert_2p$coefs <- mean_jun$coefs + sqrt(facp_jun$values[2]) * pc2
+pert_2n$coefs <- mean_jun$coefs - sqrt(facp_jun$values[2]) * pc2
+df_pcp2_jun <- data.frame(x=xx, yhat = predict(pert_2p, newdata=xx))
+df_pcn2_jun <- data.frame(x=xx, yhat = predict(pert_2n, newdata=xx))
+
+A <- ggplot() + geom_point(data=df_mean_jun, aes(mean, xx), cex=0.4) +
+  geom_point(data=df_pcp1_jun, aes(mean, xx), cex=0.01, col=my_palette[1]) +
+  geom_point(data=df_pcn1_jun, aes(mean, xx), cex=0.01, col=my_palette[2]) +
+  scale_y_reverse() +
+  theme_minimal() + ylab('Profondeur') + xlab('Température (°C)') +
+  scale_x_continuous() + ggtitle(paste('PC1', pc1_jun, '%'))
+B <- ggplot() + geom_point(data=df_mean_jun, aes(mean, xx), cex=0.4) +
+  geom_point(data=df_pcp2_jun, aes(mean, xx), cex=0.1, col=my_palette[1]) +
+  geom_point(data=df_pcn2_jun, aes(mean, xx), cex=0.1, col=my_palette[2]) +
+  scale_y_reverse() +
+  theme_minimal() + ylab('') + xlab('Température (°C)') +
+  scale_x_continuous() + ggtitle(paste('PC2', pc2_jun, '%'))
+grid.arrange(A,B, ncol=2)
+```
+
+```{r, fig.cap="Représentation bi-dimensionnelle des scores de l'ACP réalisée sur les profils de température à banyuls en juin. Les années sont représentées par un gradient de couleur."}
+label_jun <- temp_jun$ANNEE*100 + temp_jun$JOUR
+label_jun <- unique(label_jun)
+df_pc_jun <- data.frame('PC1'=facp_jun$scores[,1], 
+                    'PC2'=facp_jun$scores[,2],
+                    label_jun)
+plot_jun <- df_pc_jun %>% ggplot() + 
+  theme_light() + 
+  geom_vline(xintercept = 0, linetype='dashed') +
+  geom_hline(yintercept=0, linetype='dashed') +
+  geom_point(aes(PC1, PC2, col=label_jun), size=2) +
+  theme(aspect.ratio = 1) +
+  xlab(paste('PC1', pc1_jun, '%')) +
+  ylab(paste('PC2', pc2_jun, '%')) +
+  scale_colour_gradient2(low=my_palette[3], high=my_palette[2], mid=my_palette[4], midpoint=202000,
+                           name="Année", 
+                        breaks=seq(201900, 202200, 100),
+                        labels=c(2019, 2020, 2021, 2022)) +
+  guides(colour = guide_colourbar( ticks=FALSE)) 
+plot_jun
+```
+
+
+
+```{r, fig.width=6, fig.cap="a. Cinq premières composantes principales de l'ACp fonctionnelle réalisée sur les profils de température en juillet de 0.5 à 50m de profondeur à banyuls. b. Eboulis des valeurs propres associées aux composantes principales."}
+temp_jul <- all_temp %>% filter(MOIS==7)
+n_curves_jul <- length(unique((temp_jul$DATE)))
+argvals <- matrix(temp_jul$arg_prof, nrow=n_points, ncol=n_curves_jul)
+y_mat_jul <- matrix(temp_jul$temp, nrow=n_points, ncol=n_curves_jul)
+basis <- create.bspline.basis(c(0.5,55), breaks=arg_prof, norder=4)
+W.obj_jul <- Data2fd(argvals = argvals, y = y_mat_jul, basisobj = basis, lambda = 10e-3)
+facp_jul <- pca.fd(fdobj = W.obj_jul, nharm=5)
+par(mfrow=c(1,2), mar=c(2.1,2.1,1.5,0.5), mgp=c(1.2,0.5,0))
+plot(NULL, xlim=c(0.5,50), ylim=c(-0.4,0.4), lwd = 3, xlab='Profondeur', ylab='Harmoniques', bty='n', cex.axis=0.7, cex.lab=0.8, cex.main=0.9, main='a.')
+abline(h=0, lty='dashed')
+lines(facp_jul$harmonics) ; legend(x="topright", legend=c("PC1", "PC2", "PC3", "PC4", "PC5"), col=1:5, lty=1:5, cex=0.6)
+pc <- round(facp_jul$values/sum(facp_jul$values)*100, 3)
+plot(pc, type="h", xlab="Valeurs Propres", ylab="% d'inertie", xlim=c(1,10), bty='n', lwd=2, cex.axis=0.7, cex.lab=0.8, cex.main=0.9, main='b.')
+pc1_jul <- round(facp_jul$values[1]/sum(facp_jul$values)*100, 2)
+pc2_jul <- round(facp_jul$values[2]/sum(facp_jul$values)*100, 2)
+```
+
+```{r, fig.cap="Deux premières composantes principales de l'ACP fonctionelle réalisée sur les profils verticaux de température en juillet, exprimées comme perturbation de la moyenne. La ligne noire représente la moyenne. La ligne grise représente l'effet d'une perturbation positive. La ligne orange représente l'effet d'une perturbation négative."}
+pert_1p <- fd(basisobj=basis)
+pert_1n <- fd(basisobj=basis)
+pert_2p <- fd(basisobj=basis)
+pert_2n <- fd(basisobj=basis)
+
+xx <- seq(0.5, 50, 0.2)
+
+mean_jul <- mean.fd(W.obj_jul)
+pc1 <- matrix(facp_jul$harmonics$coefs[,1], ncol=1)
+pert_1p$coefs <- mean_jul$coefs + sqrt(facp_jul$values[1]) * pc1
+pert_1n$coefs <- mean_jul$coefs - sqrt(facp_jul$values[1]) * pc1
+
+df_mean_jul <- data.frame(x=xx, yhat = predict(mean_jul, newdata=xx))
+df_pcp1_jul <- data.frame(x=xx, yhat = predict(pert_1p, newdata=xx))
+df_pcn1_jul <- data.frame(x=xx, yhat = predict(pert_1n, newdata=xx))
+
+pc2 <- matrix(facp_jul$harmonics$coefs[,2], ncol=1)
+pert_2p$coefs <- mean_jul$coefs + sqrt(facp_jul$values[2]) * pc2
+pert_2n$coefs <- mean_jul$coefs - sqrt(facp_jul$values[2]) * pc2
+df_pcp2_jul <- data.frame(x=xx, yhat = predict(pert_2p, newdata=xx))
+df_pcn2_jul <- data.frame(x=xx, yhat = predict(pert_2n, newdata=xx))
+
+A <- ggplot() + geom_point(data=df_mean_jul, aes(mean, xx), cex=0.4) +
+  geom_point(data=df_pcp1_jul, aes(mean, xx), cex=0.01, col=my_palette[1]) +
+  geom_point(data=df_pcn1_jul, aes(mean, xx), cex=0.01, col=my_palette[2]) +
+  scale_y_reverse() +
+  theme_minimal() + ylab('Profondeur') + xlab('Température (°C)') +
+  scale_x_continuous() + ggtitle(paste('PC1', pc1_jul, '%'))
+B <- ggplot() + geom_point(data=df_mean_jul, aes(mean, xx), cex=0.4) +
+  geom_point(data=df_pcp2_jul, aes(mean, xx), cex=0.1, col=my_palette[1]) +
+  geom_point(data=df_pcn2_jul, aes(mean, xx), cex=0.1, col=my_palette[2]) +
+  scale_y_reverse() +
+  theme_minimal() + ylab('') + xlab('Température (°C)') +
+  scale_x_continuous() + ggtitle(paste('PC2', pc2_jul, '%'))
+grid.arrange(A,B, ncol=2)
+```
+
+```{r, fig.cap="Représentation bi-dimensionnelle des scores de l'ACP réalisée sur les profils de température à banyuls en juillet. Les années sont représentées par un gradient de couleur."}
+label_jul <- temp_jul$ANNEE*100 + temp_jul$JOUR
+label_jul <- unique(label_jul)
+df_pc_jul <- data.frame('PC1'=facp_jul$scores[,1], 
+                    'PC2'=facp_jul$scores[,2],
+                    label_jul)
+plot_jul <- df_pc_jul %>% ggplot() + 
+  theme_light() + 
+  geom_vline(xintercept = 0, linetype='dashed') +
+  geom_hline(yintercept=0, linetype='dashed') +
+  geom_point(aes(PC1, PC2, col=label_jul), size=2) +
+  theme(aspect.ratio = 1) +
+  xlab(paste('PC1', pc1_jul, '%')) +
+  ylab(paste('PC2', pc2_jul, '%')) +
+  scale_colour_gradient2(low=my_palette[3], high=my_palette[2], mid=my_palette[4], midpoint=202000,
+                           name="Année", 
+                        breaks=seq(201900, 202200, 100),
+                        labels=c(2019, 2020, 2021, 2022)) +
+  guides(colour = guide_colourbar( ticks=FALSE)) 
+plot_jul
+```
+
+
+
+```{r, fig.width=6, fig.cap="a. Cinq premières composantes principales de l'ACp fonctionnelle réalisée sur les profils de température en août de 0.5 à 50m de profondeur à banyuls. b. Eboulis des valeurs propres associées aux composantes principales."}
+temp_aou <- all_temp %>% filter(MOIS==8)
+n_curves_aou <- length(unique((temp_aou$DATE)))
+argvals <- matrix(temp_aou$arg_prof, nrow=n_points, ncol=n_curves_aou)
+y_mat_aou <- matrix(temp_aou$temp, nrow=n_points, ncol=n_curves_aou)
+basis <- create.bspline.basis(c(0.5,55), breaks=arg_prof, norder=4)
+W.obj_aou <- Data2fd(argvals = argvals, y = y_mat_aou, basisobj = basis, lambda = 10e-3)
+facp_aou <- pca.fd(fdobj = W.obj_aou, nharm=5)
+par(mfrow=c(1,2), mar=c(2.1,2.1,1.5,0.5), mgp=c(1.2,0.5,0))
+plot(NULL, xlim=c(0.5,50), ylim=c(-0.4,0.4), lwd = 3, xlab='Profondeur', ylab='Harmoniques', bty='n', cex.axis=0.7, cex.lab=0.8, cex.main=0.9, main='a.')
+abline(h=0, lty='dashed')
+lines(facp_aou$harmonics) ; legend(x="topright", legend=c("PC1", "PC2", "PC3", "PC4", "PC5"), col=1:5, lty=1:5, cex=0.6)
+pc <- round(facp_aou$values/sum(facp_aou$values)*100, 3)
+plot(pc, type="h", xlab="Valeurs Propres", ylab="% d'inertie", xlim=c(1,10), bty='n', lwd=2, cex.axis=0.7, cex.lab=0.8, cex.main=0.9, main='b.')
+pc1_aou <- round(facp_aou$values[1]/sum(facp_aou$values)*100, 2)
+pc2_aou <- round(facp_aou$values[2]/sum(facp_aou$values)*100, 2)
+```
+
+```{r, fig.cap="Deux premières composantes principales de l'ACP fonctionelle réalisée sur les profils verticaux de température en août, exprimées comme perturbation de la moyenne. La ligne noire représente la moyenne. La ligne grise représente l'effet d'une perturbation positive. La ligne orange représente l'effet d'une perturbation négative."}
+pert_1p <- fd(basisobj=basis)
+pert_1n <- fd(basisobj=basis)
+pert_2p <- fd(basisobj=basis)
+pert_2n <- fd(basisobj=basis)
+
+xx <- seq(0.5, 50, 0.2)
+
+mean_aou <- mean.fd(W.obj_aou)
+pc1 <- matrix(facp_aou$harmonics$coefs[,1], ncol=1)
+pert_1p$coefs <- mean_aou$coefs + sqrt(facp_aou$values[1]) * pc1
+pert_1n$coefs <- mean_aou$coefs - sqrt(facp_aou$values[1]) * pc1
+
+df_mean_aou <- data.frame(x=xx, yhat = predict(mean_aou, newdata=xx))
+df_pcp1_aou <- data.frame(x=xx, yhat = predict(pert_1p, newdata=xx))
+df_pcn1_aou <- data.frame(x=xx, yhat = predict(pert_1n, newdata=xx))
+
+pc2 <- matrix(facp_aou$harmonics$coefs[,2], ncol=1)
+pert_2p$coefs <- mean_aou$coefs + sqrt(facp_aou$values[2]) * pc2
+pert_2n$coefs <- mean_aou$coefs - sqrt(facp_aou$values[2]) * pc2
+df_pcp2_aou <- data.frame(x=xx, yhat = predict(pert_2p, newdata=xx))
+df_pcn2_aou <- data.frame(x=xx, yhat = predict(pert_2n, newdata=xx))
+
+A <- ggplot() + geom_point(data=df_mean_aou, aes(mean, xx), cex=0.4) +
+  geom_point(data=df_pcp1_aou, aes(mean, xx), cex=0.01, col=my_palette[1]) +
+  geom_point(data=df_pcn1_aou, aes(mean, xx), cex=0.01, col=my_palette[2]) +
+  scale_y_reverse() +
+  theme_minimal() + ylab('Profondeur') + xlab('Température (°C)') +
+  scale_x_continuous() + ggtitle(paste('PC1', pc1_aou, '%'))
+B <- ggplot() + geom_point(data=df_mean_aou, aes(mean, xx), cex=0.4) +
+  geom_point(data=df_pcp2_aou, aes(mean, xx), cex=0.1, col=my_palette[1]) +
+  geom_point(data=df_pcn2_aou, aes(mean, xx), cex=0.1, col=my_palette[2]) +
+  scale_y_reverse() +
+  theme_minimal() + ylab('') + xlab('Température (°C)') +
+  scale_x_continuous() + ggtitle(paste('PC2', pc2_aou, '%'))
+grid.arrange(A,B, ncol=2)
+```
+
+```{r, fig.cap="Représentation bi-dimensionnelle des scores de l'ACP réalisée sur les profils de température à banyuls en août. Les années sont représentées par un gradient de couleur."}
+label_aou <- temp_aou$ANNEE*100 + temp_aou$JOUR
+label_aou <- unique(label_aou)
+df_pc_aou <- data.frame('PC1'=facp_aou$scores[,1], 
+                    'PC2'=facp_aou$scores[,2],
+                    label_aou)
+plot_aou <- df_pc_aou %>% ggplot() + 
+  theme_light() + 
+  geom_vline(xintercept = 0, linetype='dashed') +
+  geom_hline(yintercept=0, linetype='dashed') +
+  geom_point(aes(PC1, PC2, col=label_aou), size=2) +
+  theme(aspect.ratio = 1) +
+  xlab(paste('PC1', pc1_aou, '%')) +
+  ylab(paste('PC2', pc2_aou, '%')) +
+  scale_colour_gradient2(low=my_palette[3], high=my_palette[2], mid=my_palette[4], midpoint=202000,
+                           name="Année", 
+                        breaks=seq(201900, 202200, 100),
+                        labels=c(2019, 2020, 2021, 2022)) +
+  guides(colour = guide_colourbar( ticks=FALSE)) 
+plot_aou
+```
+
+
+
+```{r, fig.width=6, fig.cap="a. Cinq premières composantes principales de l'ACp fonctionnelle réalisée sur les profils de température en septembre de 0.5 à 50m de profondeur à banyuls. b. Eboulis des valeurs propres associées aux composantes principales."}
+temp_sep <- all_temp %>% filter(MOIS==9)
+n_curves_sep <- length(unique((temp_sep$DATE)))
+argvals <- matrix(temp_sep$arg_prof, nrow=n_points, ncol=n_curves_sep)
+y_mat_sep <- matrix(temp_sep$temp, nrow=n_points, ncol=n_curves_sep)
+basis <- create.bspline.basis(c(0.5,55), breaks=arg_prof, norder=4)
+W.obj_sep <- Data2fd(argvals = argvals, y = y_mat_sep, basisobj = basis, lambda = 10e-3)
+facp_sep <- pca.fd(fdobj = W.obj_sep, nharm=5)
+par(mfrow=c(1,2), mar=c(2.1,2.1,1.5,0.5), mgp=c(1.2,0.5,0))
+plot(NULL, xlim=c(0.5,50), ylim=c(-0.4,0.4), lwd = 3, xlab='Profondeur', ylab='Harmoniques', bty='n', cex.axis=0.7, cex.lab=0.8, cex.main=0.9, main='a.')
+abline(h=0, lty='dashed')
+lines(facp_sep$harmonics) ; legend(x="topright", legend=c("PC1", "PC2", "PC3", "PC4", "PC5"), col=1:5, lty=1:5, cex=0.6)
+pc <- round(facp_sep$values/sum(facp_sep$values)*100, 3)
+plot(pc, type="h", xlab="Valeurs Propres", ylab="% d'inertie", xlim=c(1,10), bty='n', lwd=2, cex.axis=0.7, cex.lab=0.8, cex.main=0.9, main='b.')
+pc1_sep <- round(facp_sep$values[1]/sum(facp_sep$values)*100, 2)
+pc2_sep <- round(facp_sep$values[2]/sum(facp_sep$values)*100, 2)
+```
+
+```{r, fig.cap="Deux premières composantes principales de l'ACP fonctionelle réalisée sur les profils verticaux de température en septembre, exprimées comme perturbation de la moyenne. La ligne noire représente la moyenne. La ligne grise représente l'effet d'une perturbation positive. La ligne orange représente l'effet d'une perturbation négative."}
+pert_1p <- fd(basisobj=basis)
+pert_1n <- fd(basisobj=basis)
+pert_2p <- fd(basisobj=basis)
+pert_2n <- fd(basisobj=basis)
+
+xx <- seq(0.5, 50, 0.2)
+
+mean_sep <- mean.fd(W.obj_sep)
+pc1 <- matrix(facp_sep$harmonics$coefs[,1], ncol=1)
+pert_1p$coefs <- mean_sep$coefs + sqrt(facp_sep$values[1]) * pc1
+pert_1n$coefs <- mean_sep$coefs - sqrt(facp_sep$values[1]) * pc1
+
+df_mean_sep <- data.frame(x=xx, yhat = predict(mean_sep, newdata=xx))
+df_pcp1_sep <- data.frame(x=xx, yhat = predict(pert_1p, newdata=xx))
+df_pcn1_sep <- data.frame(x=xx, yhat = predict(pert_1n, newdata=xx))
+
+pc2 <- matrix(facp_sep$harmonics$coefs[,2], ncol=1)
+pert_2p$coefs <- mean_sep$coefs + sqrt(facp_sep$values[2]) * pc2
+pert_2n$coefs <- mean_sep$coefs - sqrt(facp_sep$values[2]) * pc2
+df_pcp2_sep <- data.frame(x=xx, yhat = predict(pert_2p, newdata=xx))
+df_pcn2_sep <- data.frame(x=xx, yhat = predict(pert_2n, newdata=xx))
+
+A <- ggplot() + geom_point(data=df_mean_sep, aes(mean, xx), cex=0.4) +
+  geom_point(data=df_pcp1_sep, aes(mean, xx), cex=0.01, col=my_palette[1]) +
+  geom_point(data=df_pcn1_sep, aes(mean, xx), cex=0.01, col=my_palette[2]) +
+  scale_y_reverse() +
+  theme_minimal() + ylab('Profondeur') + xlab('Température (°C)') +
+  scale_x_continuous() + ggtitle(paste('PC1', pc1_sep, '%'))
+B <- ggplot() + geom_point(data=df_mean_sep, aes(mean, xx), cex=0.4) +
+  geom_point(data=df_pcp2_sep, aes(mean, xx), cex=0.1, col=my_palette[1]) +
+  geom_point(data=df_pcn2_sep, aes(mean, xx), cex=0.1, col=my_palette[2]) +
+  scale_y_reverse() +
+  theme_minimal() + ylab('') + xlab('Température (°C)') +
+  scale_x_continuous() + ggtitle(paste('PC2', pc2_sep, '%'))
+grid.arrange(A,B, ncol=2)
+```
+
+```{r, fig.cap="Représentation bi-dimensionnelle des scores de l'ACP réalisée sur les profils de température à banyuls en septembre. Les années sont représentées par un gradient de couleur."}
+label_sep <- temp_sep$ANNEE*100 + temp_sep$JOUR
+label_sep <- unique(label_sep)
+df_pc_sep <- data.frame('PC1'=facp_sep$scores[,1], 
+                    'PC2'=facp_sep$scores[,2],
+                    label_sep)
+plot_sep <- df_pc_sep %>% ggplot() + 
+  theme_light() + 
+  geom_vline(xintercept = 0, linetype='dashed') +
+  geom_hline(yintercept=0, linetype='dashed') +
+  geom_point(aes(PC1, PC2, col=label_sep), size=2) +
+  theme(aspect.ratio = 1) +
+  xlab(paste('PC1', pc1_sep, '%')) +
+  ylab(paste('PC2', pc2_sep, '%')) +
+  scale_colour_gradient2(low=my_palette[3], high=my_palette[2], mid=my_palette[4], midpoint=202000,
+                           name="Année", 
+                        breaks=seq(201900, 202200, 100),
+                        labels=c(2019, 2020, 2021, 2022)) +
+  guides(colour = guide_colourbar( ticks=FALSE)) 
+plot_sep
+```
+
+
+
+```{r, fig.width=6, fig.cap="a. Cinq premières composantes principales de l'ACp fonctionnelle réalisée sur les profils de température en octobre de 0.5 à 50m de profondeur à banyuls. b. Eboulis des valeurs propres associées aux composantes principales."}
+temp_oct <- all_temp %>% filter(MOIS==10)
+n_curves_oct <- length(unique((temp_oct$DATE)))
+argvals <- matrix(temp_oct$arg_prof, nrow=n_points, ncol=n_curves_oct)
+y_mat_oct <- matrix(temp_oct$temp, nrow=n_points, ncol=n_curves_oct)
+basis <- create.bspline.basis(c(0.5,55), breaks=arg_prof, norder=4)
+W.obj_oct <- Data2fd(argvals = argvals, y = y_mat_oct, basisobj = basis, lambda = 10e-3)
+facp_oct <- pca.fd(fdobj = W.obj_oct, nharm=5)
+par(mfrow=c(1,2), mar=c(2.1,2.1,1.5,0.5), mgp=c(1.2,0.5,0))
+plot(NULL, xlim=c(0.5,50), ylim=c(-0.4,0.4), lwd = 3, xlab='Profondeur', ylab='Harmoniques', bty='n', cex.axis=0.7, cex.lab=0.8, cex.main=0.9, main='a.')
+abline(h=0, lty='dashed')
+lines(facp_oct$harmonics) ; legend(x="topright", legend=c("PC1", "PC2", "PC3", "PC4", "PC5"), col=1:5, lty=1:5, cex=0.6)
+pc <- round(facp_oct$values/sum(facp_oct$values)*100, 3)
+plot(pc, type="h", xlab="Valeurs Propres", ylab="% d'inertie", xlim=c(1,10), bty='n', lwd=2, cex.axis=0.7, cex.lab=0.8, cex.main=0.9, main='b.')
+pc1_oct <- round(facp_oct$values[1]/sum(facp_oct$values)*100, 2)
+pc2_oct <- round(facp_oct$values[2]/sum(facp_oct$values)*100, 2)
+```
+
+```{r, fig.cap="Deux premières composantes principales de l'ACP fonctionelle réalisée sur les profils verticaux de température en octobre, exprimées comme perturbation de la moyenne. La ligne noire représente la moyenne. La ligne grise représente l'effet d'une perturbation positive. La ligne orange représente l'effet d'une perturbation négative."}
+pert_1p <- fd(basisobj=basis)
+pert_1n <- fd(basisobj=basis)
+pert_2p <- fd(basisobj=basis)
+pert_2n <- fd(basisobj=basis)
+
+xx <- seq(0.5, 50, 0.2)
+
+mean_oct <- mean.fd(W.obj_oct)
+pc1 <- matrix(facp_oct$harmonics$coefs[,1], ncol=1)
+pert_1p$coefs <- mean_oct$coefs + sqrt(facp_oct$values[1]) * pc1
+pert_1n$coefs <- mean_oct$coefs - sqrt(facp_oct$values[1]) * pc1
+
+df_mean_oct <- data.frame(x=xx, yhat = predict(mean_oct, newdata=xx))
+df_pcp1_oct <- data.frame(x=xx, yhat = predict(pert_1p, newdata=xx))
+df_pcn1_oct <- data.frame(x=xx, yhat = predict(pert_1n, newdata=xx))
+
+pc2 <- matrix(facp_oct$harmonics$coefs[,2], ncol=1)
+pert_2p$coefs <- mean_oct$coefs + sqrt(facp_oct$values[2]) * pc2
+pert_2n$coefs <- mean_oct$coefs - sqrt(facp_oct$values[2]) * pc2
+df_pcp2_oct <- data.frame(x=xx, yhat = predict(pert_2p, newdata=xx))
+df_pcn2_oct <- data.frame(x=xx, yhat = predict(pert_2n, newdata=xx))
+
+A <- ggplot() + geom_point(data=df_mean_oct, aes(mean, xx), cex=0.4) +
+  geom_point(data=df_pcp1_oct, aes(mean, xx), cex=0.01, col=my_palette[1]) +
+  geom_point(data=df_pcn1_oct, aes(mean, xx), cex=0.01, col=my_palette[2]) +
+  scale_y_reverse() +
+  theme_minimal() + ylab('Profondeur') + xlab('Température (°C)') +
+  scale_x_continuous() + ggtitle(paste('PC1', pc1_oct, '%'))
+B <- ggplot() + geom_point(data=df_mean_oct, aes(mean, xx), cex=0.4) +
+  geom_point(data=df_pcp2_oct, aes(mean, xx), cex=0.1, col=my_palette[1]) +
+  geom_point(data=df_pcn2_oct, aes(mean, xx), cex=0.1, col=my_palette[2]) +
+  scale_y_reverse() +
+  theme_minimal() + ylab('') + xlab('Température (°C)') +
+  scale_x_continuous() + ggtitle(paste('PC2', pc2_oct, '%'))
+grid.arrange(A,B, ncol=2)
+```
+
+```{r, fig.cap="Représentation bi-dimensionnelle des scores de l'ACP réalisée sur les profils de température à banyuls en octobre. Les années sont représentées par un gradient de couleur."}
+label_oct <- temp_oct$ANNEE*100 + temp_oct$JOUR
+label_oct <- unique(label_oct)
+df_pc_oct <- data.frame('PC1'=facp_oct$scores[,1], 
+                    'PC2'=facp_oct$scores[,2],
+                    label_oct)
+plot_oct <- df_pc_oct %>% ggplot() + 
+  theme_light() + 
+  geom_vline(xintercept = 0, linetype='dashed') +
+  geom_hline(yintercept=0, linetype='dashed') +
+  geom_point(aes(PC1, PC2, col=label_oct), size=2) +
+  theme(aspect.ratio = 1) +
+  xlab(paste('PC1', pc1_oct, '%')) +
+  ylab(paste('PC2', pc2_oct, '%')) +
+  scale_colour_gradient2(low=my_palette[3], high=my_palette[2], mid=my_palette[4], midpoint=202000,
+                           name="Année", 
+                        breaks=seq(201900, 202200, 100),
+                        labels=c(2019, 2020, 2021, 2022)) +
+  guides(colour = guide_colourbar( ticks=FALSE)) 
+plot_oct
+```
+
+
+
+```{r, fig.width=6, fig.cap="a. Cinq premières composantes principales de l'ACp fonctionnelle réalisée sur les profils de température en novembre de 0.5 à 50m de profondeur à banyuls. b. Eboulis des valeurs propres associées aux composantes principales."}
+temp_nov <- all_temp %>% filter(MOIS==11)
+n_curves_nov <- length(unique((temp_nov$DATE)))
+argvals <- matrix(temp_nov$arg_prof, nrow=n_points, ncol=n_curves_nov)
+y_mat_nov <- matrix(temp_nov$temp, nrow=n_points, ncol=n_curves_nov)
+basis <- create.bspline.basis(c(0.5,55), breaks=arg_prof, norder=4)
+W.obj_nov <- Data2fd(argvals = argvals, y = y_mat_nov, basisobj = basis, lambda = 10e-3)
+facp_nov <- pca.fd(fdobj = W.obj_nov, nharm=5)
+par(mfrow=c(1,2), mar=c(2.1,2.1,1.5,0.5), mgp=c(1.2,0.5,0))
+plot(NULL, xlim=c(0.5,50), ylim=c(-0.4,0.4), lwd = 3, xlab='Profondeur', ylab='Harmoniques', bty='n', cex.axis=0.7, cex.lab=0.8, cex.main=0.9, main='a.')
+abline(h=0, lty='dashed')
+lines(facp_nov$harmonics) ; legend(x="topright", legend=c("PC1", "PC2", "PC3", "PC4", "PC5"), col=1:5, lty=1:5, cex=0.6)
+pc <- round(facp_nov$values/sum(facp_nov$values)*100, 3)
+plot(pc, type="h", xlab="Valeurs Propres", ylab="% d'inertie", xlim=c(1,10), bty='n', lwd=2, cex.axis=0.7, cex.lab=0.8, cex.main=0.9, main='b.')
+pc1_nov <- round(facp_nov$values[1]/sum(facp_nov$values)*100, 2)
+pc2_nov <- round(facp_nov$values[2]/sum(facp_nov$values)*100, 2)
+```
+
+```{r, fig.cap="Deux premières composantes principales de l'ACP fonctionelle réalisée sur les profils verticaux de température en novembre, exprimées comme perturbation de la moyenne. La ligne noire représente la moyenne. La ligne grise représente l'effet d'une perturbation positive. La ligne orange représente l'effet d'une perturbation négative."}
+pert_1p <- fd(basisobj=basis)
+pert_1n <- fd(basisobj=basis)
+pert_2p <- fd(basisobj=basis)
+pert_2n <- fd(basisobj=basis)
+
+xx <- seq(0.5, 50, 0.2)
+
+mean_nov <- mean.fd(W.obj_nov)
+pc1 <- matrix(facp_nov$harmonics$coefs[,1], ncol=1)
+pert_1p$coefs <- mean_nov$coefs + sqrt(facp_nov$values[1]) * pc1
+pert_1n$coefs <- mean_nov$coefs - sqrt(facp_nov$values[1]) * pc1
+
+df_mean_nov <- data.frame(x=xx, yhat = predict(mean_nov, newdata=xx))
+df_pcp1_nov <- data.frame(x=xx, yhat = predict(pert_1p, newdata=xx))
+df_pcn1_nov <- data.frame(x=xx, yhat = predict(pert_1n, newdata=xx))
+
+pc2 <- matrix(facp_nov$harmonics$coefs[,2], ncol=1)
+pert_2p$coefs <- mean_nov$coefs + sqrt(facp_nov$values[2]) * pc2
+pert_2n$coefs <- mean_nov$coefs - sqrt(facp_nov$values[2]) * pc2
+df_pcp2_nov <- data.frame(x=xx, yhat = predict(pert_2p, newdata=xx))
+df_pcn2_nov <- data.frame(x=xx, yhat = predict(pert_2n, newdata=xx))
+
+A <- ggplot() + geom_point(data=df_mean_nov, aes(mean, xx), cex=0.4) +
+  geom_point(data=df_pcp1_nov, aes(mean, xx), cex=0.01, col=my_palette[1]) +
+  geom_point(data=df_pcn1_nov, aes(mean, xx), cex=0.01, col=my_palette[2]) +
+  scale_y_reverse() +
+  theme_minimal() + ylab('Profondeur') + xlab('Température (°C)') +
+  scale_x_continuous() + ggtitle(paste('PC1', pc1_nov, '%'))
+B <- ggplot() + geom_point(data=df_mean_nov, aes(mean, xx), cex=0.4) +
+  geom_point(data=df_pcp2_nov, aes(mean, xx), cex=0.1, col=my_palette[1]) +
+  geom_point(data=df_pcn2_nov, aes(mean, xx), cex=0.1, col=my_palette[2]) +
+  scale_y_reverse() +
+  theme_minimal() + ylab('') + xlab('Température (°C)') +
+  scale_x_continuous() + ggtitle(paste('PC2', pc2_nov, '%'))
+grid.arrange(A,B, ncol=2)
+```
+
+```{r, fig.cap="Représentation bi-dimensionnelle des scores de l'ACP réalisée sur les profils de température à banyuls en novembre. Les années sont représentées par un gradient de couleur."}
+label_nov <- temp_nov$ANNEE*100 + temp_nov$JOUR
+label_nov <- unique(label_nov)
+df_pc_nov <- data.frame('PC1'=facp_nov$scores[,1], 
+                    'PC2'=facp_nov$scores[,2],
+                    label_nov)
+plot_nov <- df_pc_nov %>% ggplot() + 
+  theme_light() + 
+  geom_vline(xintercept = 0, linetype='dashed') +
+  geom_hline(yintercept=0, linetype='dashed') +
+  geom_point(aes(PC1, PC2, col=label_nov), size=2) +
+  theme(aspect.ratio = 1) +
+  xlab(paste('PC1', pc1_nov, '%')) +
+  ylab(paste('PC2', pc2_nov, '%')) +
+  scale_colour_gradient2(low=my_palette[3], high=my_palette[2], mid=my_palette[4], midpoint=202000,
+                           name="Année", 
+                        breaks=seq(201900, 202200, 100),
+                        labels=c(2019, 2020, 2021, 2022)) +
+  guides(colour = guide_colourbar( ticks=FALSE)) 
+plot_nov
+```
+
+
+
+```{r, fig.width=6, fig.cap="a. Cinq premières composantes principales de l'ACp fonctionnelle réalisée sur les profils de température en décembre de 0.5 à 50m de profondeur à banyuls. b. Eboulis des valeurs propres associées aux composantes principales."}
+temp_dec <- all_temp %>% filter(MOIS==12)
+n_curves_dec <- length(unique((temp_dec$DATE)))
+argvals <- matrix(temp_dec$arg_prof, nrow=n_points, ncol=n_curves_dec)
+y_mat_dec <- matrix(temp_dec$temp, nrow=n_points, ncol=n_curves_dec)
+basis <- create.bspline.basis(c(0.5,55), breaks=arg_prof, norder=4)
+W.obj_dec <- Data2fd(argvals = argvals, y = y_mat_dec, basisobj = basis, lambda = 10e-3)
+facp_dec <- pca.fd(fdobj = W.obj_dec, nharm=5)
+par(mfrow=c(1,2), mar=c(2.1,2.1,1.5,0.5), mgp=c(1.2,0.5,0))
+plot(NULL, xlim=c(0.5,50), ylim=c(-0.4,0.4), lwd = 3, xlab='Profondeur', ylab='Harmoniques', bty='n', cex.axis=0.7, cex.lab=0.8, cex.main=0.9, main='a.')
+abline(h=0, lty='dashed')
+lines(facp_dec$harmonics) ; legend(x="topright", legend=c("PC1", "PC2", "PC3", "PC4", "PC5"), col=1:5, lty=1:5, cex=0.6)
+pc <- round(facp_dec$values/sum(facp_dec$values)*100, 3)
+plot(pc, type="h", xlab="Valeurs Propres", ylab="% d'inertie", xlim=c(1,10), bty='n', lwd=2, cex.axis=0.7, cex.lab=0.8, cex.main=0.9, main='b.')
+pc1_dec <- round(facp_dec$values[1]/sum(facp_dec$values)*100, 2)
+pc2_dec <- round(facp_dec$values[2]/sum(facp_dec$values)*100, 2)
+```
+
+```{r, fig.cap="Deux premières composantes principales de l'ACP fonctionelle réalisée sur les profils verticaux de température en décembre, exprimées comme perturbation de la moyenne. La ligne noire représente la moyenne. La ligne grise représente l'effet d'une perturbation positive. La ligne orange représente l'effet d'une perturbation négative."}
+pert_1p <- fd(basisobj=basis)
+pert_1n <- fd(basisobj=basis)
+pert_2p <- fd(basisobj=basis)
+pert_2n <- fd(basisobj=basis)
+
+xx <- seq(0.5, 50, 0.2)
+
+mean_dec <- mean.fd(W.obj_dec)
+pc1 <- matrix(facp_dec$harmonics$coefs[,1], ncol=1)
+pert_1p$coefs <- mean_dec$coefs + sqrt(facp_dec$values[1]) * pc1
+pert_1n$coefs <- mean_dec$coefs - sqrt(facp_dec$values[1]) * pc1
+
+df_mean_dec <- data.frame(x=xx, yhat = predict(mean_dec, newdata=xx))
+df_pcp1_dec <- data.frame(x=xx, yhat = predict(pert_1p, newdata=xx))
+df_pcn1_dec <- data.frame(x=xx, yhat = predict(pert_1n, newdata=xx))
+
+pc2 <- matrix(facp_dec$harmonics$coefs[,2], ncol=1)
+pert_2p$coefs <- mean_dec$coefs + sqrt(facp_dec$values[2]) * pc2
+pert_2n$coefs <- mean_dec$coefs - sqrt(facp_dec$values[2]) * pc2
+df_pcp2_dec <- data.frame(x=xx, yhat = predict(pert_2p, newdata=xx))
+df_pcn2_dec <- data.frame(x=xx, yhat = predict(pert_2n, newdata=xx))
+
+A <- ggplot() + geom_point(data=df_mean_dec, aes(mean, xx), cex=0.4) +
+  geom_point(data=df_pcp1_dec, aes(mean, xx), cex=0.01, col=my_palette[1]) +
+  geom_point(data=df_pcn1_dec, aes(mean, xx), cex=0.01, col=my_palette[2]) +
+  scale_y_reverse() +
+  theme_minimal() + ylab('Profondeur') + xlab('Température (°C)') +
+  scale_x_continuous() + ggtitle(paste('PC1', pc1_dec, '%'))
+B <- ggplot() + geom_point(data=df_mean_dec, aes(mean, xx), cex=0.4) +
+  geom_point(data=df_pcp2_dec, aes(mean, xx), cex=0.1, col=my_palette[1]) +
+  geom_point(data=df_pcn2_dec, aes(mean, xx), cex=0.1, col=my_palette[2]) +
+  scale_y_reverse() +
+  theme_minimal() + ylab('') + xlab('Température (°C)') +
+  scale_x_continuous() + ggtitle(paste('PC2', pc2_dec, '%'))
+grid.arrange(A,B, ncol=2)
+```
+
+```{r, fig.cap="Représentation bi-dimensionnelle des scores de l'ACP réalisée sur les profils de température à banyuls en décembre. Les années sont représentées par un gradient de couleur."}
+label_dec <- temp_dec$ANNEE*100 + temp_dec$JOUR
+label_dec <- unique(label_dec)
+df_pc_dec <- data.frame('PC1'=facp_dec$scores[,1], 
+                    'PC2'=facp_dec$scores[,2],
+                    label_dec)
+plot_dec <- df_pc_dec %>% ggplot() + 
+  theme_light() + 
+  geom_vline(xintercept = 0, linetype='dashed') +
+  geom_hline(yintercept=0, linetype='dashed') +
+  geom_point(aes(PC1, PC2, col=label_dec), size=2) +
+  theme(aspect.ratio = 1) +
+  xlab(paste('PC1', pc1_dec, '%')) +
+  ylab(paste('PC2', pc2_dec, '%')) +
+  scale_colour_gradient2(low=my_palette[3], high=my_palette[2], mid=my_palette[4], midpoint=202000,
+                           name="Année", 
+                        breaks=seq(201900, 202200, 100),
+                        labels=c(2019, 2020, 2021, 2022)) +
+  guides(colour = guide_colourbar( ticks=FALSE)) 
+plot_dec
+```
+
+
+```{r, fig.width=7, fig.height=8, fig.pos="!p", fig.cap="Comparaison des scores des 2 premières composantes principales pour chaque mois."}
+ggarrange(plot_jan, plot_fev, plot_mar, plot_avr,
+             plot_mai, plot_jun, plot_jul, plot_aou,
+             plot_sep, plot_oct, plot_nov, plot_dec, ncol=3, nrow=4, common.legend=TRUE, legend="right",
+          labels=months, font.label=list(size=10))
+```
+
+
+```{r}
+SE_u <- fd(basisobj = basis)
+SE_l <- fd(basisobj = basis)
+
+sd_jan <- std.fd(W.obj_jan)
+SE_u$coefs <- mean_jan$coefs +  1.96 * sd_jan$coefs/sqrt(n_curves_jan) 
+SE_l$coefs <- mean_jan$coefs -  1.96 * sd_jan$coefs/sqrt(n_curves_jan)
+df_seu_jan <- data.frame(x=xx, yhat = predict(SE_u, newdata=xx))
+df_sel_jan <- data.frame(x=xx, yhat = predict(SE_l, newdata=xx))
+SE_jan <- ggplot() + geom_point(data=df_mean_jan, aes(mean, xx), cex=0.2) +
+  geom_point(data=df_seu_jan, aes(mean, xx), cex=0.01, col=my_palette[1]) +
+  geom_point(data=df_sel_jan, aes(mean, xx), cex=0.01, col=my_palette[1]) +
+  scale_y_reverse() +
+  theme_minimal() + ylab('Profondeur') + xlab('Température (°C)') +
+  scale_x_continuous(limits=c(11,23)) 
+#fev
+sd_fev <- std.fd(W.obj_fev)
+SE_u$coefs <- mean_fev$coefs +  1.96 * sd_fev$coefs/sqrt(n_curves_fev) 
+SE_l$coefs <- mean_fev$coefs -  1.96 * sd_fev$coefs/sqrt(n_curves_fev)
+df_seu_fev <- data.frame(x=xx, yhat = predict(SE_u, newdata=xx))
+df_sel_fev <- data.frame(x=xx, yhat = predict(SE_l, newdata=xx))
+SE_fev <- ggplot() + geom_point(data=df_mean_fev, aes(mean, xx), cex=0.2) +
+  geom_point(data=df_seu_fev, aes(mean, xx), cex=0.01, col=my_palette[1]) +
+  geom_point(data=df_sel_fev, aes(mean, xx), cex=0.01, col=my_palette[1]) +
+  scale_y_reverse() +
+  theme_minimal() + ylab('Profondeur') + xlab('Température (°C)') +
+  scale_x_continuous(limits=c(11,23)) 
+
+#mar
+sd_mar <- std.fd(W.obj_mar)
+SE_u$coefs <- mean_mar$coefs +  1.96 * sd_mar$coefs/sqrt(n_curves_mar) 
+SE_l$coefs <- mean_mar$coefs -  1.96 * sd_mar$coefs/sqrt(n_curves_mar)
+df_seu_mar <- data.frame(x=xx, yhat = predict(SE_u, newdata=xx))
+df_sel_mar <- data.frame(x=xx, yhat = predict(SE_l, newdata=xx))
+SE_mar <- ggplot() + geom_point(data=df_mean_mar, aes(mean, xx), cex=0.2) +
+  geom_point(data=df_seu_mar, aes(mean, xx), cex=0.01, col=my_palette[1]) +
+  geom_point(data=df_sel_mar, aes(mean, xx), cex=0.01, col=my_palette[1]) +
+  scale_y_reverse() +
+  theme_minimal() + ylab('Profondeur') + xlab('Température (°C)') +
+  scale_x_continuous(limits=c(11,23)) 
+
+#avr
+sd_avr <- std.fd(W.obj_avr)
+SE_u$coefs <- mean_avr$coefs +  1.96 * sd_avr$coefs/sqrt(n_curves_avr) 
+SE_l$coefs <- mean_avr$coefs -  1.96 * sd_avr$coefs/sqrt(n_curves_avr)
+df_seu_avr <- data.frame(x=xx, yhat = predict(SE_u, newdata=xx))
+df_sel_avr <- data.frame(x=xx, yhat = predict(SE_l, newdata=xx))
+SE_avr <- ggplot() + geom_point(data=df_mean_avr, aes(mean, xx), cex=0.2) +
+  geom_point(data=df_seu_avr, aes(mean, xx), cex=0.01, col=my_palette[1]) +
+  geom_point(data=df_sel_avr, aes(mean, xx), cex=0.01, col=my_palette[1]) +
+  scale_y_reverse() +
+  theme_minimal() + ylab('Profondeur') + xlab('Température (°C)') +
+  scale_x_continuous(limits=c(11,23)) 
+
+#mai
+sd_mai <- std.fd(W.obj_mai)
+SE_u$coefs <- mean_mai$coefs +  1.96 * sd_mai$coefs/sqrt(n_curves_mai) 
+SE_l$coefs <- mean_mai$coefs -  1.96 * sd_mai$coefs/sqrt(n_curves_mai)
+df_seu_mai <- data.frame(x=xx, yhat = predict(SE_u, newdata=xx))
+df_sel_mai <- data.frame(x=xx, yhat = predict(SE_l, newdata=xx))
+SE_mai <- ggplot() + geom_point(data=df_mean_mai, aes(mean, xx), cex=0.2) +
+  geom_point(data=df_seu_mai, aes(mean, xx), cex=0.01, col=my_palette[1]) +
+  geom_point(data=df_sel_mai, aes(mean, xx), cex=0.01, col=my_palette[1]) +
+  scale_y_reverse() +
+  theme_minimal() + ylab('Profondeur') + xlab('Température (°C)') +
+  scale_x_continuous(limits=c(11,23)) 
+
+#jun
+sd_jun <- std.fd(W.obj_jun)
+SE_u$coefs <- mean_jun$coefs +  1.96 * sd_jun$coefs/sqrt(n_curves_jun) 
+SE_l$coefs <- mean_jun$coefs -  1.96 * sd_jun$coefs/sqrt(n_curves_jun)
+df_seu_jun <- data.frame(x=xx, yhat = predict(SE_u, newdata=xx))
+df_sel_jun <- data.frame(x=xx, yhat = predict(SE_l, newdata=xx))
+SE_jun <- ggplot() + geom_point(data=df_mean_jun, aes(mean, xx), cex=0.2) +
+  geom_point(data=df_seu_jun, aes(mean, xx), cex=0.01, col=my_palette[1]) +
+  geom_point(data=df_sel_jun, aes(mean, xx), cex=0.01, col=my_palette[1]) +
+  scale_y_reverse() +
+  theme_minimal() + ylab('Profondeur') + xlab('Température (°C)') +
+  scale_x_continuous(limits=c(11,23)) 
+
+#jul
+sd_jul <- std.fd(W.obj_jul)
+SE_u$coefs <- mean_jul$coefs +  1.96 * sd_jul$coefs/sqrt(n_curves_jul) 
+SE_l$coefs <- mean_jul$coefs -  1.96 * sd_jul$coefs/sqrt(n_curves_jul)
+df_seu_jul <- data.frame(x=xx, yhat = predict(SE_u, newdata=xx))
+df_sel_jul <- data.frame(x=xx, yhat = predict(SE_l, newdata=xx))
+SE_jul <- ggplot() + geom_point(data=df_mean_jul, aes(mean, xx), cex=0.2) +
+  geom_point(data=df_seu_jul, aes(mean, xx), cex=0.01, col=my_palette[1]) +
+  geom_point(data=df_sel_jul, aes(mean, xx), cex=0.01, col=my_palette[1]) +
+  scale_y_reverse() +
+  theme_minimal() + ylab('Profondeur') + xlab('Température (°C)') +
+  scale_x_continuous(limits=c(11,23)) 
+
+#aou
+sd_aou <- std.fd(W.obj_aou)
+SE_u$coefs <- mean_aou$coefs +  1.96 * sd_aou$coefs/sqrt(n_curves_aou) 
+SE_l$coefs <- mean_aou$coefs -  1.96 * sd_aou$coefs/sqrt(n_curves_aou)
+df_seu_aou <- data.frame(x=xx, yhat = predict(SE_u, newdata=xx))
+df_sel_aou <- data.frame(x=xx, yhat = predict(SE_l, newdata=xx))
+SE_aou <- ggplot() + geom_point(data=df_mean_aou, aes(mean, xx), cex=0.2) +
+  geom_point(data=df_seu_aou, aes(mean, xx), cex=0.01, col=my_palette[1]) +
+  geom_point(data=df_sel_aou, aes(mean, xx), cex=0.01, col=my_palette[1]) +
+  scale_y_reverse() +
+  theme_minimal() + ylab('Profondeur') + xlab('Température (°C)') +
+  scale_x_continuous(limits=c(11,23)) 
+
+#sep
+sd_sep <- std.fd(W.obj_sep)
+SE_u$coefs <- mean_sep$coefs +  1.96 * sd_sep$coefs/sqrt(n_curves_sep) 
+SE_l$coefs <- mean_sep$coefs -  1.96 * sd_sep$coefs/sqrt(n_curves_sep)
+df_seu_sep <- data.frame(x=xx, yhat = predict(SE_u, newdata=xx))
+df_sel_sep <- data.frame(x=xx, yhat = predict(SE_l, newdata=xx))
+SE_sep <- ggplot() + geom_point(data=df_mean_sep, aes(mean, xx), cex=0.2) +
+  geom_point(data=df_seu_sep, aes(mean, xx), cex=0.01, col=my_palette[1]) +
+  geom_point(data=df_sel_sep, aes(mean, xx), cex=0.01, col=my_palette[1]) +
+  scale_y_reverse() +
+  theme_minimal() + ylab('Profondeur') + xlab('Température (°C)') +
+  scale_x_continuous(limits=c(11,23)) 
+#oct
+sd_oct <- std.fd(W.obj_oct)
+SE_u$coefs <- mean_oct$coefs +  1.96 * sd_oct$coefs/sqrt(n_curves_oct) 
+SE_l$coefs <- mean_oct$coefs -  1.96 * sd_oct$coefs/sqrt(n_curves_oct)
+df_seu_oct <- data.frame(x=xx, yhat = predict(SE_u, newdata=xx))
+df_sel_oct <- data.frame(x=xx, yhat = predict(SE_l, newdata=xx))
+SE_oct <- ggplot() + geom_point(data=df_mean_oct, aes(mean, xx), cex=0.2) +
+  geom_point(data=df_seu_oct, aes(mean, xx), cex=0.01, col=my_palette[1]) +
+  geom_point(data=df_sel_oct, aes(mean, xx), cex=0.01, col=my_palette[1]) +
+  scale_y_reverse() +
+  theme_minimal() + ylab('Profondeur') + xlab('Température (°C)') +
+  scale_x_continuous(limits=c(11,23)) 
+#nov
+sd_nov <- std.fd(W.obj_nov)
+SE_u$coefs <- mean_nov$coefs +  1.96 * sd_nov$coefs/sqrt(n_curves_nov) 
+SE_l$coefs <- mean_nov$coefs -  1.96 * sd_nov$coefs/sqrt(n_curves_nov)
+df_seu_nov <- data.frame(x=xx, yhat = predict(SE_u, newdata=xx))
+df_sel_nov <- data.frame(x=xx, yhat = predict(SE_l, newdata=xx))
+SE_nov <- ggplot() + geom_point(data=df_mean_nov, aes(mean, xx), cex=0.2) +
+  geom_point(data=df_seu_nov, aes(mean, xx), cex=0.01, col=my_palette[1]) +
+  geom_point(data=df_sel_nov, aes(mean, xx), cex=0.01, col=my_palette[1]) +
+  scale_y_reverse() +
+  theme_minimal() + ylab('Profondeur') + xlab('Température (°C)') +
+  scale_x_continuous(limits=c(11,23)) 
+
+#dec
+sd_dec <- std.fd(W.obj_dec)
+SE_u$coefs <- mean_dec$coefs +  1.96 * sd_dec$coefs/sqrt(n_curves_dec) 
+SE_l$coefs <- mean_dec$coefs -  1.96 * sd_dec$coefs/sqrt(n_curves_dec)
+df_seu_dec <- data.frame(x=xx, yhat = predict(SE_u, newdata=xx))
+df_sel_dec <- data.frame(x=xx, yhat = predict(SE_l, newdata=xx))
+SE_dec <- ggplot() + geom_point(data=df_mean_dec, aes(mean, xx), cex=0.2) +
+  geom_point(data=df_seu_dec, aes(mean, xx), cex=0.01, col=my_palette[1]) +
+  geom_point(data=df_sel_dec, aes(mean, xx), cex=0.01, col=my_palette[1]) +
+  scale_y_reverse() +
+  theme_minimal() + ylab('Profondeur') + xlab('Température (°C)') +
+  scale_x_continuous(limits=c(11,23)) 
+```
+
+```{r, fig.width=7, fig.height=8, fig.pos="!p", fig.cap="Comparaison des profils verticaux moyens de températures en noir avec intervalles de confiance à 95% associés en gris pour chaque mois."}
+ggarrange(SE_jan, SE_fev, SE_mar, SE_avr,
+             SE_mai, SE_jun, SE_jul, SE_aou,
+             SE_sep, SE_oct, SE_nov, SE_dec, ncol=3, nrow=4, common.legend=TRUE, legend="right",
+          labels=months, font.label=list(size=10))
+```
+
+```{r}
+box_jan <- temp_jan %>% ggplot() + geom_boxplot(aes(arg_prof, temp, group=factor(gp_prof)), col=my_palette[1], lwd=.3, outlier.size=.5) +
+  coord_flip() +
+  scale_x_reverse() +
+  theme_minimal() + xlab('Profondeur') + ylab('Température (°C)') +
+  scale_y_continuous(limits=c(11,23)) 
+box_fev <- temp_fev %>% ggplot() + geom_boxplot(aes(arg_prof, temp, group=factor(gp_prof)), col=my_palette[1], lwd=.3, outlier.size=.5) +
+  coord_flip() +
+  scale_x_reverse() +
+  theme_minimal() + xlab('Profondeur') + ylab('Température (°C)') +
+  scale_y_continuous(limits=c(11,23)) 
+box_mar <- temp_mar %>% ggplot() + geom_boxplot(aes(arg_prof, temp, group=factor(gp_prof)), col=my_palette[1], lwd=.3, outlier.size=.5) +
+  coord_flip() +
+  scale_x_reverse() +
+  theme_minimal() + xlab('Profondeur') + ylab('Température (°C)') +
+  scale_y_continuous(limits=c(11,23)) 
+box_avr <- temp_avr %>% ggplot() + geom_boxplot(aes(arg_prof, temp, group=factor(gp_prof)), col=my_palette[1], lwd=.3, outlier.size=.5) +
+  coord_flip() +
+  scale_x_reverse() +
+  theme_minimal() + xlab('Profondeur') + ylab('Température (°C)') +
+  scale_y_continuous(limits=c(11,23)) 
+box_mai <- temp_mai %>% ggplot() + geom_boxplot(aes(arg_prof, temp, group=factor(gp_prof)), col=my_palette[1], lwd=.3, outlier.size=.5) +
+  coord_flip() +
+  scale_x_reverse() +
+  theme_minimal() + xlab('Profondeur') + ylab('Température (°C)') +
+  scale_y_continuous(limits=c(11,23)) 
+box_jun <- temp_jun %>% ggplot() + geom_boxplot(aes(arg_prof, temp, group=factor(gp_prof)), col=my_palette[1], lwd=.3, outlier.size=.5) +
+  coord_flip() +
+  scale_x_reverse() +
+  theme_minimal() + xlab('Profondeur') + ylab('Température (°C)') +
+  scale_y_continuous(limits=c(11,23)) 
+box_jul <- temp_jul %>% ggplot() + geom_boxplot(aes(arg_prof, temp, group=factor(gp_prof)), col=my_palette[1], lwd=.3, outlier.size=.5) +
+  coord_flip() +
+  scale_x_reverse() +
+  theme_minimal() + xlab('Profondeur') + ylab('Température (°C)') +
+  scale_y_continuous(limits=c(11,23)) 
+box_aou <- temp_aou %>% ggplot() + geom_boxplot(aes(arg_prof, temp, group=factor(gp_prof)), col=my_palette[1], lwd=.3, outlier.size=.5) +
+  coord_flip() +
+  scale_x_reverse() +
+  theme_minimal() + xlab('Profondeur') + ylab('Température (°C)') +
+  scale_y_continuous(limits=c(11,23)) 
+box_sep <- temp_sep %>% ggplot() + geom_boxplot(aes(arg_prof, temp, group=factor(gp_prof)), col=my_palette[1], lwd=.3, outlier.size=.5) +
+  coord_flip() +
+  scale_x_reverse() +
+  theme_minimal() + xlab('Profondeur') + ylab('Température (°C)') +
+  scale_y_continuous(limits=c(11,23)) 
+box_oct <- temp_oct %>% ggplot() + geom_boxplot(aes(arg_prof, temp, group=factor(gp_prof)), col=my_palette[1], lwd=.3, outlier.size=.5) +
+  coord_flip() +
+  scale_x_reverse() +
+  theme_minimal() + xlab('Profondeur') + ylab('Température (°C)') +
+  scale_y_continuous(limits=c(11,23)) 
+box_nov <- temp_nov %>% ggplot() + geom_boxplot(aes(arg_prof, temp, group=factor(gp_prof)), col=my_palette[1], lwd=.3, outlier.size=.5) +
+  coord_flip() +
+  scale_x_reverse() +
+  theme_minimal() + xlab('Profondeur') + ylab('Température (°C)') +
+  scale_y_continuous(limits=c(11,23)) 
+box_dec <- temp_dec %>% ggplot() + geom_boxplot(aes(arg_prof, temp, group=factor(gp_prof)), col=my_palette[1], lwd=.3, outlier.size=.5) +
+  coord_flip() +
+  scale_x_reverse() +
+  theme_minimal() + xlab('Profondeur') + ylab('Température (°C)') +
+  scale_y_continuous(limits=c(11,23)) 
+```
+
+```{r, fig.width=7, fig.height=8, fig.pos="!p", fig.cap="Boxplot des valeurs de températures en fonction de la profondeur par intervalle de 3m pour chaque mois. "}
+ggarrange(box_jan, box_fev, box_mar, box_avr,
+             box_mai, box_jun, box_jul, box_aou,
+             box_sep, box_oct, box_nov, box_dec, ncol=3, nrow=4, common.legend=TRUE, legend="right",
+          labels=months, font.label=list(size=10))
+```

@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="en-us" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content='Exploration des séries temporelles Nous disposons des séries temporelles d&amp;rsquo;abondance (en cellules/mL) pour plusieurs groupes d&amp;rsquo;organismes de 2012 à 2021. Ces séries sont celles obtenues après un lissage par régression polynomiale locale sur les données échantillonnées en moyenne deux fois par mois.
+La Figure 1 présente la série temporelle pour de l&amp;rsquo;abondance de Synechococcus à Banyuls.
+Figure 1: Série temporelle de l&#39;abondance de Synechococcus à Banyuls de 2012 à 2021.'>
+<title>Analyse spectrale</title>
+
+<link rel='canonical' href='https://ambremari.github.io/my_thesis_blog/p/analyse-spectrale/'>
+
+<link rel="stylesheet" href="/my_thesis_blog/scss/style.min.abbd69b2908fdfcd5179898beaafd374514a86538d81639ddd2c58c06ae54e40.css"><meta property='og:title' content='Analyse spectrale'>
+<meta property='og:description' content='Exploration des séries temporelles Nous disposons des séries temporelles d&amp;rsquo;abondance (en cellules/mL) pour plusieurs groupes d&amp;rsquo;organismes de 2012 à 2021. Ces séries sont celles obtenues après un lissage par régression polynomiale locale sur les données échantillonnées en moyenne deux fois par mois.
+La Figure 1 présente la série temporelle pour de l&amp;rsquo;abondance de Synechococcus à Banyuls.
+Figure 1: Série temporelle de l&#39;abondance de Synechococcus à Banyuls de 2012 à 2021.'>
+<meta property='og:url' content='https://ambremari.github.io/my_thesis_blog/p/analyse-spectrale/'>
+<meta property='og:site_name' content='Mathilde Couteyen Carpaye'>
+<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='Time serie' /><meta property='article:tag' content='Spectral analysis' /><meta property='article:published_time' content='2022-03-01T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2022-03-01T00:00:00&#43;00:00'/>
+<meta name="twitter:title" content="Analyse spectrale">
+<meta name="twitter:description" content="Exploration des séries temporelles Nous disposons des séries temporelles d&amp;rsquo;abondance (en cellules/mL) pour plusieurs groupes d&amp;rsquo;organismes de 2012 à 2021. Ces séries sont celles obtenues après un lissage par régression polynomiale locale sur les données échantillonnées en moyenne deux fois par mois.
+La Figure 1 présente la série temporelle pour de l&amp;rsquo;abondance de Synechococcus à Banyuls.
+Figure 1: Série temporelle de l&#39;abondance de Synechococcus à Banyuls de 2012 à 2021.">
+    <link rel="shortcut icon" href="/favicon.png" />
+
+    </head>
+    <body class="
+    article-page
+    ">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="Toggle Menu">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/my_thesis_blog/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/my_thesis_blog/img/photo_profil_hu3474e4567f1abffa55ded49f8acfa40e_40711_300x0_resize_q75_box.jpg" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">🍥</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/my_thesis_blog">Mathilde Couteyen Carpaye</a></h1>
+            <h2 class="site-description">Caractériser la structure et la dynamique des assemblages phytoplanctoniques du milieu côtier de la série temporelle SOMLIT</h2>
+        </div>
+    </header><ol class="social-menu">
+            
+                <li>
+                    <a 
+                        href='https://github.com/Ambremari/2022_SOMLIT_MED'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/my_thesis_blog/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>Home</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/my_thesis_blog/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>Archives</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/my_thesis_blog/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>Search</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/my_thesis_blog/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>Links</span>
+            </a>
+        </li>
+        
+
+        <div class="menu-bottom-section">
+            
+            
+                <li id="dark-mode-toggle">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                    <span>Dark Mode</span>
+                </li>
+            
+        </div>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">Table of contents</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#périodogramme">Périodogramme</a></li>
+    <li><a href="#densité-spectrale">Densité spectrale</a></li>
+  </ol>
+
+  <ol>
+    <li><a href="#harmoniques">Harmoniques</a></li>
+    <li><a href="#textittapering">\textit{Tapering}</a></li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+    <header class="article-category">
+        
+            <a href="/my_thesis_blog/categories/notes/" >
+                Notes
+            </a>
+        
+    </header>
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/my_thesis_blog/p/analyse-spectrale/">Analyse spectrale</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published">Mar 01, 2022</time>
+            </div>
+        
+
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <polyline points="12 7 12 12 15 15" />
+</svg>
+
+
+
+                <time class="article-time--reading">
+                    10 minute read
+                </time>
+            </div>
+        
+    </footer>
+    
+
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <h1 id="exploration-des-séries-temporelles">Exploration des séries temporelles</h1>
+<p>Nous disposons des séries temporelles d&rsquo;abondance (en cellules/mL)  pour plusieurs groupes d&rsquo;organismes de 2012 à 2021. Ces séries sont celles obtenues après un lissage par régression polynomiale locale sur les données échantillonnées en moyenne deux fois par mois.</p>
+<p>La Figure 1 présente la série temporelle pour de l&rsquo;abondance de Synechococcus à Banyuls.</p>
+<div class="figure">
+<img src="https://ambremari.github.io/my_thesis_blog/p/analyse-spectrale/index_files/figure-html/unnamed-chunk-1-1.png" alt="Série temporelle de l'abondance de Synechococcus à Banyuls de 2012 à 2021." width="672" />
+<p class="caption"><span id="fig:unnamed-chunk-1"></span>Figure 1: Série temporelle de l'abondance de Synechococcus à Banyuls de 2012 à 2021.</p>
+</div>
+<p>La série semble dirigée par des composants périodiques. Ce pourquoi on choisit de réaliser une analyse dans le domaine de fréquence. Ainsi, on étudie  la série comme variation périodiques des phénomènes sous-jacents. Cette approche apporte l&rsquo;avantage de pouvoir évaluer un comportement périodique commun à deux séries.</p>
+<h2 id="périodogramme">Périodogramme</h2>
+<p>Pour tout échantillon de séries temporelles <code>\(x_1, ...x_n\)</code> avec <code>\(n\)</code> impaire on peut écrire :</p>
+<p>[x_t=a_0 + \sum_{j=1}^{(n-1)/2}[a_jcos(2\pi t j/n)+b_jsin(2\pi t j/n)]]</p>
+<p>Le périodogramme échelonné peut être définit de la manière suivante :</p>
+<p>[P(j/n)=a^2_j+b^2_j]</p>
+<p>Le périodogramme indique quelles composantes de fréquences ont une grande magnitude et lesquelles ont une faible magnitude. De grandes valeurs de <code>\(P(j/n)\)</code> indique donc quelles fréquences <code>\(w_j=j/n\)</code> sont prédominantes dans la série. Les petites valeurs de <code>\(P(j/n)\)</code> sont plus suceptibles d&rsquo;être associées au bruit.</p>
+<p>Les valeurs de <code>\(a_j\)</code> et <code>\(b_j\)</code> peuvent être obtenues avec la <em>fast Fourrier transform</em> (FFT) :</p>
+<p>[|d(j/n)|^2=\frac{1}{n}\Big(\sum_{t=1}^nx_tcos(2\pi tj/n\Big)^2+\frac{1}{n}\Big(\sum_{t=1}^nx_tsin(2\pi tj/n\Big)^2]</p>
+<p>On peut obtenir le périodogramme de la manière suivante :</p>
+<p>[P(j/n)=\frac{4}{n}|d(j/n)|^2]</p>
+<p>La première étape consiste à s&rsquo;affranchir de la tendance présente dans notre série. En effet, les tendances vont donner de l&rsquo;importance à des composantes de faible fréquence qui vont obscurcir les plus grandes fréquences. En général, on réalise un centrage des données de la forme <code>\(x_t-\bar{x}\)</code> en amont d&rsquo;une analyse spectrale.</p>
+<div class="figure">
+<img src="https://ambremari.github.io/my_thesis_blog/p/analyse-spectrale/index_files/figure-html/unnamed-chunk-2-1.png" alt="Périodogramme correspondant à l'abondance de Synechococcus à Banyuls de 2012 à 2021 avec échelle de fréquence annuelle." width="672" />
+<p class="caption"><span id="fig:unnamed-chunk-2"></span>Figure 2: Périodogramme correspondant à l'abondance de Synechococcus à Banyuls de 2012 à 2021 avec échelle de fréquence annuelle.</p>
+</div>
+<h2 id="densité-spectrale">Densité spectrale</h2>
+<p>La densité spectrale est analogue à une densité de probabilité. Elle donne la même information que la fonction d&rsquo;autocovariance. Cependant au lieu d&rsquo;exprimer la covariance en terme de lags, elle l&rsquo;exprime en terme de cycle.</p>
+<p>Soit la fonction d&rsquo;autocovariance d&rsquo;un processus stationnaire <code>\(\gamma(h)\)</code>, la densité spectrale s&rsquo;exprime comme la transformation inverse de l&rsquo;autocovariance :</p>
+<p>[f(\omega)=\sum_{h=-\infty}^\infty \gamma(h)e^{-2\pi i\omega h} \quad -1/2\leq \omega \leq 1/2]</p>
+<h1 id="estimation-spectrale-non-paramétrique">Estimation spectrale non-paramétrique</h1>
+<p>La bande de fréquence <code>\(\mathcal B\)</code> de <code>\(L&lt;&lt;n\)</code> fréquences fondamentales contigues centrée en <code>\(\omega_j\)</code>, s&rsquo;exprime de la manière suivante :</p>
+<p>[\mathcal{B}=\Big{\omega^<em>:\omega_j-\frac{m}{n}\leq\omega^</em>\leq\omega_j+\frac{m}{n}\Big}]</p>
+<p>avec <code>\(L=2m+1\)</code> impair, choisi de manière à ce que les valeurs spectrales dans l&rsquo;intervalle <code>\(\mathcal B\)</code> :</p>
+<p>[f(\omega_j+k/n), \quad k=-m,&hellip;,0,&hellip;m]</p>
+<p>soit approximativemment égales à <code>\(f(\omega)\)</code>. Les valeurs du spectre à l&rsquo;intérieure de cette bande doivent être rlativement constante pour que le spectre lissé soit un bon estimateur.</p>
+<p>Le périodogramme moyen (ou lissé) et défini comme la moyenne des valeurs du périodogramme sur la bande <code>\(\mathcal B\)</code>.</p>
+<p>[\bar{f}(\omega)=\frac{1}{L}\sum_{k=-m}^mI(\omega_j+k/n)]</p>
+<p>Pour de grande valeurs de <code>\(n\)</code>, les périodogrammes moyens sont distribués comme des variables aléatoires indépendantes <code>\(f(\omega)\chi_2^2/2\)</code> pour <code>\(0&lt;\omega&lt;1/2\)</code>, ainsi</p>
+<p>[\frac{2L\bar{f}(\omega)}{f(\omega)}\sim \chi_{2L}^2]</p>
+<p>On parle alors de fenêtre pour faire référence à la largeur de l&rsquo;intervalle de fréquence définit par <code>\(B=L/n\)</code>. On peut ainsi obtenir une approximation d&rsquo;un intervalle de confiance à <code>\(100(1-\alpha)\%\)</code> de la forme :</p>
+<p>[\frac{2L\bar{f}(\omega)}{\chi_{2L}^2(1-\alpha/2)}\leq f(\omega) \leq \frac{2L\bar{f}(\omega)}{\chi_{2L}^2(\alpha/2)}]</p>
+<p>La FFT est redondante lorsque <code>\(n\)</code> est un multiple de plusieurs facteurs de 2,3 ou 5. Pour profiter de cette propriété, il est commun de rajouter des 0 pour atteindre l&rsquo;entier composite le plus proche <code>\(n'\)</code>. Dans ce cas, il faut remplacer <code>\(2L\)</code> par <code>\(2L/n'\)</code>. On définit les degrés de liberté ajustés :</p>
+<p>[df=\frac{2Ln}{n&rsquo;}]</p>
+<p>et l&rsquo;intervalle de confiance devient :</p>
+<p>[\frac{df\bar{f}(\omega)}{\chi_{df}^2(1-\alpha/2)}\leq f(\omega) \leq \frac{df\bar{f}(\omega)}{\chi_{df}^2(\alpha/2)}]</p>
+<p>Après des tests avec plusieurs valeurs de fenêtre, celle qui semble la plus compatbile avec le premier spectre (Figure 2) est celle obtenue avec <code>\(L=3\)</code> avec un noyau de Daniell (Figure 3).</p>
+<div class="figure">
+<img src="https://ambremari.github.io/my_thesis_blog/p/analyse-spectrale/index_files/figure-html/unnamed-chunk-3-1.png" alt="Périodogramme moyen correspondant à l'abondance de Synechococcus à Banyuls de 2012 à 2021 avec échelle de fréquence en cycle annuel. `\(n=\)` 3243 , `\(n'=\)` 3375 , `\(L=\)` 3 , `\(df=\)` 5.765" width="672" />
+<p class="caption"><span id="fig:unnamed-chunk-3"></span>Figure 3: Périodogramme moyen correspondant à l'abondance de Synechococcus à Banyuls de 2012 à 2021 avec échelle de fréquence en cycle annuel. `\(n=\)` 3243 , `\(n'=\)` 3375 , `\(L=\)` 3 , `\(df=\)` 5.765</p>
+</div>
+<p>Il faut noter que les fréquences qui apparaissent sur la Figure 3 correspondent à des cycles annuels. On retrouve donc bien notre cycle annuel (1/1) et notre cycle semestriel (1/2 an = 6 mois) ainsi que des pics mineurs au niveau des harmoniques. Les intrevalles de confiance associés sont présentés dans le Tableau 1. Dans les deux cas, la borne inférieure de l&rsquo;intrvalle de confiance a une puissance supérieure au reste du spectre sans ces deux pics.</p>
+<p>\begin{table}[h]
+\caption{Interval de confiance à <code>\(95\%\)</code> pour le spectre de l&rsquo;abondance de Synechococcus à Banyuls de 2012 à 2021.}
+\centering
+\begin{tabular}{c c c c c}
+\hline
+<code>\(\omega\)</code> &amp; Période &amp; Puissance &amp; Inférieur &amp; Supérieur\
+\hline
+1/365 &amp; 1 an &amp; 1.2\times 10^{8} &amp; 5.1\times 10^{7} &amp; 6.3\times 10^{8}\
+1/180 &amp; 6 mois &amp; 4.8\times 10^{7} &amp; 2\times 10^{7} &amp; 2.5\times 10^{8} \
+\hline
+\end{tabular}
+\end{table}</p>
+<h2 id="harmoniques">Harmoniques</h2>
+<p>Comme c&rsquo;est le cas pour le spectre de l&rsquo;abondance de Synechococcus, il est commun d&rsquo;observer des pics mineurs au niveau des harmoniques. Ici, on a un pic important à <code>\(\omega = 1\Delta\)</code> un cycle d&rsquo;un an, un pic moins important à <code>\(\omega=2\Delta\)</code> et des pics mineurs aux autres harmoniques <code>\(\omega=k\Delta\)</code> pour <code>\(k=3,4\)</code> &hellip; Ce cas est courant car la plupart des signaux ne sont pas des sinusoïdes parfait. Les harmoniques permettent alors de capturer le comportement non-sinyusoïdal du signal. La question est de décider si un pic est significatif ou non. On s&rsquo;intéresse alors aux affirmations simultanées sur une gamme de fréquences.</p>
+<p>Soit <code>\(K\)</code> affirmations <code>\(S_1, S_2,..., S_k\)</code> réalisées à un niveau de confiance <code>\(\alpha\)</code>, <code>\(P\{S_k\}=1-\alpha\)</code> alors la probabilité que toutes les affirmations soient vraies satisfait l&rsquo;inéquation de Bonferroni :</p>
+<p>[P{\text{tous }S_K \text{ vrais}}\geq 1-K\alpha]</p>
+<p>Il est préferrable de fixer le niveau de confiance pour les tests de chaque fréquence à <code>\(\alpha/K\)</code> s&rsquo;il y a <code>\(K\)</code> potentielles fréquences d&rsquo;intérêt.</p>
+<p>Il est possible de renforcer l&rsquo;estimation en utilisant une moyenne pondérée :</p>
+<p>[\hat f (\omega) = \sum_{k=-m}^mh_kI(\omega_j+k/n) ]</p>
+<p>avec les poids <code>\(h_k&gt;0\)</code> qui satisfont :</p>
+<p>[\sum_{k=-m}^mh_k=1]</p>
+<p>On fixe <code>\(h_k=L^{-1}\)</code> pour tous <code>\(k\)</code>, dans ce cas <code>\(\sum_{k=-m}^mh_k^2=L^{-1}\)</code>. On définit ainsi :</p>
+<p>[L_h=\bigg(\sum_{k=-m}^mh_k^2\bigg)^{-1}]</p>
+<p>et réalise l&rsquo;approximation :</p>
+<p>[\frac{2L_h\hat f(\omega)}{f(\omega)}\sim\chi_{2L_h}^2]</p>
+<p>La fenêtre est alors <code>\(B=L_h/n\)</code> et l&rsquo;intervalle de confiance est de la forme :</p>
+<p>[\frac{2L_h\hat{f}(\omega)}{\chi_{2L_h}^2(1-\alpha/2)}\leq f(\omega) \leq \frac{2L_h\hat{f}(\omega)}{\chi_{2L_h}^2(\alpha/2)}]</p>
+<p>On choisis d&rsquo;appliquer un noyau de Daniell modifié à <code>\(m=1\)</code> deux fois. On obtient ainsi <code>\(L_h=</code>r Lh)<code>proche de notre</code>(L=3)` précédent.</p>
+<h2 id="textittapering">\textit{Tapering}</h2>
+<p>Lors de la création de fenêtre, les fenêtre sans <em>taper</em> peuvent produire des ondulations sur la bande voulu et à l&rsquo;extérieur de la bande. Ces dernières sont appelées <em>sidelobes</em>. Ainsi, il est possible que certaines fréquences en dehors de l&rsquo;intervalle voulu contaminent la bande. Pour supprimer cet effet de fuite, il est possible d&rsquo;utiliser des <em>taper</em>.</p>
+<p>Les <em>taper</em> ont généralement une forme qui amplifie le centre des données par rapport aux extrémités, comme une cloche cosinus de la forme :</p>
+<p>[h_t=0.5\bigg[1 + cos\bigg(\frac{2\pi(t- \bar t)}{n}\bigg)\bigg]]</p>
+<p>On peut remplacer une série orginiale par une sérier <em>tapered</em> :</p>
+<p>[y_t = h_tx_t]</p>
+<div class="figure">
+<img src="https://ambremari.github.io/my_thesis_blog/p/analyse-spectrale/index_files/figure-html/unnamed-chunk-6-1.png" alt="Périodogramme moyen de l'abondance de Synechococcus à banyuls de 2012 à 2021 avec noyau de Daniell modifié sans taper (ligne pointillée) et avec tapering complet par une cloche cosinus (ligne pleine)." width="672" />
+<p class="caption"><span id="fig:unnamed-chunk-6"></span>Figure 4: Périodogramme moyen de l'abondance de Synechococcus à banyuls de 2012 à 2021 avec noyau de Daniell modifié sans taper (ligne pointillée) et avec tapering complet par une cloche cosinus (ligne pleine).</p>
+</div>
+<h1 id="filtres-linéaires">Filtres linéaires</h1>
+<p>Les filtres linéaires peuvent être utilisés pour extraire des signaux des séries temporelles.</p>
+<p>Si notre série filtrée <code>\(y_t\)</code> peut s&rsquo;écrire de la manière suivante :</p>
+<p>[y_t=\sum_{j=-\infty}^\infty a_jx_{t-j} \quad \sum_{j=-\infty}^\infty|a_j|&lt;\infty]</p>
+<p>alors <code>\(x_t\)</code> a un spectre <code>\(f_{xx}(\omega)\)</code> et <code>\(y_t\)</code> a un spectre</p>
+<p>[f_{yy}(\omega)=|A_{yx}(\omega)|^2f_{xx}(\omega)]</p>
+<p>Avec <code>\(A_{yx}(\omega)\)</code> la fonction de fréquence de réponse :</p>
+<p>[A_{yx}(\omega)=\sum_{j=-\infty}^\infty a_je^{-2\pi i\omega j}]</p>
+<p>Autrement dit, l&rsquo;effet du filtrage peut être caractérisé par le produit de la fréquence et de la magnitude de la fonction de fréquence réponse au carré.</p>
+<p>On présente deux filtres, la première différence :</p>
+<p>[y_t=\nabla x_t= x_t-x_{t-1}]</p>
+<p>et le filtre par moyenne annuelle symétrique mobile, avec <code>\(t\)</code> exprimé en mois ou noyau de Daniell modifié avec <code>\(m=6\)</code> :</p>
+<p>[y_t=\frac{1}{24}(x_{t-6}+x_{t+6}) + \frac{1}{12}\sum_{r=-5}^5x_{t-r}]</p>
+<p>Comme on peut le voir sur la Figure 3, l&rsquo;effet de la différenciation est de <em>roughen</em> la série en retenant les plus grandes fréquences, c&rsquo;est un exemple de filtre <em>high-pass</em>. A l&rsquo;inverse, l&rsquo;effet de la moyenne mobile centrée est de lisser la série en gardant les basses fréquences et en atténuant les hautes fréquences. C&rsquo;est un exemple de filtre <em>low-pass</em>.</p>
+<div class="figure">
+<img src="https://ambremari.github.io/my_thesis_blog/p/analyse-spectrale/index_files/figure-html/unnamed-chunk-7-1.png" alt="Comparaison de la série temporelle d'abondance de Synechococcus à banyuls (haut), avec la série différenciée (milieu) et la moyenne mobile centrée à 12 mois." width="672" />
+<p class="caption"><span id="fig:unnamed-chunk-7"></span>Figure 5: Comparaison de la série temporelle d'abondance de Synechococcus à banyuls (haut), avec la série différenciée (milieu) et la moyenne mobile centrée à 12 mois.</p>
+</div>
+<p>Pour comprendre de quelle manière les filtres affectent le signal original, on étudie le carré de la fréquence de réponse <code>\(|A_{yx}(\omega)|^2\)</code> (Figure 4). Pour la différenciation on a :</p>
+<p>[A_{yx}(\omega)=1-e^{-2\pi i \omega}]</p>
+<p>Pour moyenne mobile centrée à 12 mois on a :</p>
+<p>[A_{yx}(\omega)=\frac{1}{12}\Big[1+cos(12\pi\omega) + 2\sum_{k=1}^5cos(2\pi\omega k)\Big]]</p>
+<p>Le filtrage par différenciation va renforcer les hautes fréquences notamment à partir 3 ce qui correspond à une période de 120 jours (Figure 6). A l&rsquo;inverse, le filtrage par moyenne mobile va fortement atténuer l&rsquo;effet des fréquences supérieures à 0.8. Ainsi, on voit disparaître les cycles annuels et semestriels.</p>
+<p>Dans le deux cas on a éliminé le cycle annuel. Dans le premier cas les variations à petites échelles sont mises en avant. Dans le second cas on a une mise en évidence de la tendance sur la période globale de la série.</p>
+<p>On va tenter d&rsquo;améliorre le flitrage du signal pour ne garder que les fréquences inférieures à 1 cycle annuel et ne pas introduire des fréquences supérieures à 1 comme le réalise légèrement le filtre par moyenne mobile.</p>
+<div class="figure">
+<img src="https://ambremari.github.io/my_thesis_blog/p/analyse-spectrale/index_files/figure-html/unnamed-chunk-8-1.png" alt="Carré de la fréquence de réponse pour les filtres par différentation (haut) et par moyenne mobile sur 12 mois (bas)." width="672" />
+<p class="caption"><span id="fig:unnamed-chunk-8"></span>Figure 6: Carré de la fréquence de réponse pour les filtres par différentation (haut) et par moyenne mobile sur 12 mois (bas).</p>
+</div>
+<h1 id="extraction-du-signal-et-filtrage-optimal">Extraction du signal et filtrage optimal</h1>
+<p>Dans le cas d&rsquo;un modèle de signal avec bruit :</p>
+<p>[y_t=x_t+v_t]</p>
+<p>on s&rsquo;intéresse à l&rsquo;estimation d&rsquo;un signal <code>\(x_t\)</code> de la forme :</p>
+<p>[\hat x_t=\sum_{r=-\infty}^\infty a_ry_{t-r}]</p>
+<p>On cherche les coefficients du filtre <code>\(a_t\)</code> qui minimisent le moyenne de l&rsquo;erreur quadratique :</p>
+<p>[MSE=E\bigg[\bigg(x_t-\sum_{r=-\infty}^\infty a_ry_{t-r}\bigg)^2\bigg]]</p>
+<p>Cela revient à résoudre</p>
+<p>[\sum_{r=-\infty}^\infty a_r\gamma_{yy}(s-r)=\gamma_{xy}(s)]</p>
+<p>qui équivaut à :</p>
+<p>[A(\omega)f_{yy}(\omega)=f_{xy}(\omega)]</p>
+<p><code>\(A(\omega)\)</code> et le filtre optimal <code>\(a_t\)</code> sont des transfomrations paires de Fourrier pour <code>\(B(\omega)\)</code> et <code>\(\beta_t\)</code>.</p>
+<p>[f_{xy}(\omega)=B^*(\omega)f_{xx}(\omega)]</p>
+<p>[f_{yy}(\omega)=|B(\omega)|^2f_{xx}(\omega)+f_{vv}(\omega)]</p>
+<p>Impliquent que le filtre optimal serait la transformation de Fourrier de :</p>
+<p>[A(\omega)=\frac{B^*(\omega)}{\Big(|B(\omega)|^2+\frac{f_{vv}(\omega)}{f_{xx}(\omega)}\Big)}]</p>
+<p>où le second terme du dénominateur est l&rsquo;inverse du ratio signal-bruit :</p>
+<p>[SNR(\omega)=\frac{f_{xx}(\omega)}{f_{vv}(\omega)}]</p>
+<p>Les filtres optimaux peuvent donc être calculés si les spectres du signal et du bruit sont connus ou bien si on suppose connu le ratio signal-bruit. Si le ratio signal-bruit est connu, le filtre optimal peut être calculé comme la transformation inverse de la fonction <code>\(A(\omega)\)</code>. On aurait alors la fonction d&rsquo;estimation du filtre :</p>
+<p>[a_t^M=M^{-1}\sum_{k=0}^{M-1}A(\omega_k)e^{2\pi i\omega_kt}]</p>
+<p>Avec <code>\(M&lt;&lt;n\)</code> et en pratique pour <code>\(|t|&gt;M/2\)</code>, <code>\(a_t=0\)</code>.</p>
+<p>Il est possible que la forme de la fréquence réponse affiche des transitions abruptes entre des régions où le ratio signal-bruit est fort et où le signal est faible. La fréquence réponse pourrait alors présenter des ondulations qui introduieraient des fréquences à différentes amplitudes. Une solution pour palier à ce problème est d&rsquo;introduir le <em>tapering</em>. On utilise le filtre <em>tapered</em> <code>\(\tilde a=h_ta_t\)</code> où <code>\(h_t\)</code> est le <em>taper</em> cosinus. La fonction réponse au carré est alors <code>\(|\tilde A(\omega)|^2\)</code> où :</p>
+<p>[\tilde A(\omega)=\sum_{t=-\infty}^\infty a_th_te^{-2\pi i\omega t}]</p>
+<p>On garde un <code>\(L=3\)</code> comme pour les analyses précédentes. On ajuste le choix de <code>\(M\)</code> en fonction de l&rsquo;allure de la fonction de fréquence réponse atteinte (Figure 7). Le <code>\(M\)</code> chosi est 1000 (jours).</p>
+<div class="figure">
+<img src="https://ambremari.github.io/my_thesis_blog/p/analyse-spectrale/index_files/figure-html/unnamed-chunk-9-1.png" alt="Coefficients du filtre avec cosinus \textit{taper} pour l'abondance de Synechococcus à Banyuls (haut). Fonctions de fréquence réponse désirée (en bleu, pointillé) et atteinte (en rouge) pour l'abondance de Synechococcus à Banyuls avec fréquence en cycle annuel (bas). `\(L=3\)` et `\(M=1000\)`" width="672" />
+<p class="caption"><span id="fig:unnamed-chunk-9"></span>Figure 7: Coefficients du filtre avec cosinus \textit{taper} pour l'abondance de Synechococcus à Banyuls (haut). Fonctions de fréquence réponse désirée (en bleu, pointillé) et atteinte (en rouge) pour l'abondance de Synechococcus à Banyuls avec fréquence en cycle annuel (bas). `\(L=3\)` et `\(M=1000\)`</p>
+</div>
+<p>On voit que le filtre accorde encore une part d&rsquo;importance au cycle annuel. Néanmoins il va complètement filtrer toutes les fréquences supérieures à 1,5. Le signal filtré obtenu est illsutré en Figure 8.</p>
+<div class="figure">
+<img src="https://ambremari.github.io/my_thesis_blog/p/analyse-spectrale/index_files/figure-html/unnamed-chunk-10-1.png" alt="Série originale de l'abondance de Synechococcus à Banyuls (haut) comparée à la série filtrée (bas)." width="672" />
+<p class="caption"><span id="fig:unnamed-chunk-10"></span>Figure 8: Série originale de l'abondance de Synechococcus à Banyuls (haut) comparée à la série filtrée (bas).</p>
+</div>
+<p>Le problème qui se présente de manière évidente et que le choix d&rsquo;un <code>\(M=1000\)</code> nous prive de 500 valeurs en début et 500 valeurs en fin de série. Néanmoins, ce filtre nous permet d&rsquo;avoir une idée de la tendance générale en identifiant clairement les années et les cycles annuels.</p>
+<h1 id="séries-multiples-et-spectres-croisés">Séries multiples et spectres croisés</h1>
+<p>Cohérence&hellip;</p>
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/my_thesis_blog/tags/time-serie/">Time serie</a>
+        
+            <a href="/my_thesis_blog/tags/spectral-analysis/">Spectral analysis</a>
+        
+    </section>
+
+
+    
+    <section class="article-copyright">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copyright" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <path d="M14.5 9a3.5 4 0 1 0 0 6" />
+</svg>
+
+
+
+        <span>Licensed under CC BY-NC-SA 4.0</span>
+    </section>
+    </footer>
+
+
+    
+        <link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/katex@0.15.6/dist/katex.min.css"integrity="sha256-J&#43;iAE0sgH8QSz9hpcDxXIftnj65JEZgNhGcgReTTK9s="crossorigin="anonymous"
+            ><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.15.6/dist/katex.min.js"integrity="sha256-InsNdER1b2xUewP&#43;pKCUJpkhiqwHgqiPXDlIk7GzBu4="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.15.6/dist/contrib/auto-render.min.js"integrity="sha256-y39Mpg7V3D4lhBX4x6O0bUqTV4pSrfgwEfGKfxkOdgI="crossorigin="anonymous"
+                defer
+                >
+            </script><script>
+    window.addEventListener("DOMContentLoaded", () => {
+        renderMathInElement(document.querySelector(`.article-content`), {
+            delimiters: [
+                { left: "$$", right: "$$", display: true },
+                { left: "$", right: "$", display: false },
+                { left: "\\(", right: "\\)", display: false },
+                { left: "\\[", right: "\\]", display: true }
+            ],
+            ignoredClasses: ["gist"]
+        });})
+</script>
+    
+</article>
+
+    
+
+    
+
+     
+    
+        
+    <div class="disqus-container">
+    <div id="disqus_thread"></div>
+<script type="application/javascript">
+    window.disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "suivi-these-couteyen" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+</div>
+
+<style>
+    .disqus-container {
+        background-color: var(--card-background);
+        border-radius: var(--card-border-radius);
+        box-shadow: var(--shadow-l1);
+        padding: var(--card-padding);
+    }
+</style>
+
+<script>
+    window.addEventListener('onColorSchemeChange', (e) => {
+        if (typeof DISQUS == 'object') {
+            DISQUS.reset({
+                reload: true
+            });
+        }
+    })
+</script>
+
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+            2020 - 
+        
+        2023 Mathilde Couteyen Carpaye
+    </section>
+    
+    <section class="powerby">
+        Built with <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> <br />
+        Theme <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.21.0">Stack</a></b> designed by <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a>
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/my_thesis_blog/ts/main.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>

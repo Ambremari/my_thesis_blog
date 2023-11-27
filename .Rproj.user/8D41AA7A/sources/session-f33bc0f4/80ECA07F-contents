@@ -1,0 +1,8 @@
+baseurl: https://ambremari.github.io/my_thesis_blog/
+publishDir: docs
+languageCode: en-us
+paginate: 5
+title: Mathilde Couteyen Carpaye
+defaultContentLanguage: en
+hasCJKLanguage: no
+disqusShortname: suivi-these-couteyen
